@@ -1,25 +1,77 @@
-﻿namespace wahaha.API.Models.Domain;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+namespace wahaha.API.Models.Domain;
 
-public class Tasks
+[Table("tasks")]
+public class Task
 {
-    public Guid Id { get; set; }
-    public int UserId { get; set; }
-    public string Title { get; set; }
-    public string Description { get; set; }
-    public string Category { get; set; }
-    public string Priority { get; set; }
-    public string Status { get; set; }
-    public int PointValue { get; set; }
-    public DateTime DueDate { get; set; }
-    public DateTime CreatedDate { get; set; }
-    public DateTime CompletedDate { get; set; }
-    public bool IsRecurring { get; set; }
-    public RecurrenceType Recurrence { get; set; }
+    [Key]
+    [Column("task_id")]
+    public Guid TaskId { get; set; } = Guid.NewGuid();
+
+    [Required]
+    [Column("user_id")]
+    public Guid UserId { get; set; }
+
+    [Required]
+    [MaxLength(100)]
+    [Column("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [MaxLength(255)]
+    [Column("description")]
+    public string? Description { get; set; }
+
+    [Required]
+    [MaxLength(50)]
+    [Column("category")]
+    public string Category { get; set; } = string.Empty;
+
+    [Required]
+    [Column("priority")]
+    public Priority Priority { get; set; }
+
+    [Required]
+    [Column("status")]
+    public ByteTaskStatus Status { get; set; } = ByteTaskStatus.pending;
+
+    [Column("point_value")]
+    [Range(0, int.MaxValue)]
+    public int PointValue { get; set; } = 10;
+
+    [Column("due_date")]
+    public DateTime? DueDate { get; set; }
+
+    [Required]
+    [Column("created_at")]
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column("completed_at")]
+    public DateTime? CompletedAt { get; set; }
+
+    [Required]
+    [Column("is_recurring")]
+    public bool IsRecurring { get; set; } = false;
+
+    [MaxLength(50)]
+    [Column("recurrence_rule")]
+    public string? RecurrenceRule { get; set; }
+
+    // Navigation property
+    [ForeignKey("UserId")]
+    public Users? User { get; set; }
 }
-
-public enum RecurrenceType
+public enum Priority
 {
-    DAILY,
-    WEEKLY,
-    YEARLY
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL
+}
+public enum ByteTaskStatus
+{
+    pending,
+    in_progress,
+    completed,
+    cancelled
 }
