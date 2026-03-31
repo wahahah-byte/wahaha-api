@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using wahaha.API.Models.Domain;
 namespace wahaha.API.Models.Domain;
 
 [Table("avatar_items")]

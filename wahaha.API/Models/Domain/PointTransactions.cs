@@ -7,7 +7,7 @@ public class PointTransaction
 {
     [Key]
     [Column("transaction_id")]
-    public Guid TransactionId { get; set; } = Guid.NewGuid();
+    public int TransactionId { get; set; }
 
     [Required]
     [Column("user_id")]

@@ -1,176 +1,121 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using wahaha.API.Data;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
+using wahaha.API.Models.DTOs;
+using wahaha.API.Repositories.Interfaces;
 
-namespace wahaha.API.Controllers
+namespace wahaha.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class UsersController : ControllerBase
+    private readonly IUserRepository _userRepository;
+    private readonly IMapper _mapper;
+
+    public UsersController(IUserRepository userRepository, IMapper mapper)
     {
-        private readonly WahahaDbContext _context;
+        _userRepository = userRepository;
+        _mapper = mapper;
+    }
 
-        public UsersController(WahahaDbContext context)
-        {
-            _context = context;
-        }
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<UserDto>>> GetAll()
+    {
+        var users = await _userRepository.GetAllWithTransactionsAsync();
+        return Ok(_mapper.Map<IEnumerable<UserDto>>(users));
+    }
 
-        // ============================================================
-        //  GET api/users
-        //  Returns all users
-        // ============================================================
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Users>>> GetAll()
-        {
-            var users = await _context.Users.ToListAsync();
-            return Ok(users);
-        }
+    [HttpGet("{id}")]
+    public async Task<ActionResult<UserDto>> GetById(Guid id)
+    {
+        var user = await _userRepository.GetByIdWithTransactionsAsync(id);
 
-        // ============================================================
-        //  GET api/users/{id}
-        //  Returns a single user by ID
-        // ============================================================
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Users>> GetById(Guid id)
-        {
-            var user = await _context.Users.FindAsync(id);
+        if (user == null)
+            return NotFound($"User with ID {id} was not found.");
 
-            if (user == null)
-                return NotFound($"Users with ID {id} was not found.");
+        return Ok(_mapper.Map<UserDto>(user));
+    }
 
-            return Ok(user);
-        }
+    [HttpGet("username/{username}")]
+    public async Task<ActionResult<UserDto>> GetByUsername(string username)
+    {
+        var user = await _userRepository.GetByUsernameAsync(username);
 
-        // ============================================================
-        //  GET api/users/username/{username}
-        //  Returns a single user by username
-        // ============================================================
-        [HttpGet("username/{username}")]
-        public async Task<ActionResult<Users>> GetByUsername(string username)
-        {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == username);
+        if (user == null)
+            return NotFound($"User '{username}' was not found.");
 
-            if (user == null)
-                return NotFound($"Users '{username}' was not found.");
+        return Ok(_mapper.Map<UserDto>(user));
+    }
 
-            return Ok(user);
-        }
+    [HttpPost]
+    public async Task<ActionResult<UserDto>> Create(CreateUserDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        // ============================================================
-        //  POST api/users
-        //  Creates a new user
-        // ============================================================
-        [HttpPost]
-        public async Task<ActionResult<Users>> Create(Users user)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+        var user = _mapper.Map<Users>(dto);
+        var created = await _userRepository.CreateAsync(user);
 
-            user.UserId = Guid.NewGuid();
-            user.CreatedAt = DateTime.UtcNow;
+        return CreatedAtAction(nameof(GetById), new { id = created.UserId }, _mapper.Map<UserDto>(created));
+    }
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(Guid id, UpdateUserDto dto)
+    {
+        if (id != dto.UserId)
+            return BadRequest("User ID in the URL does not match the request body.");
 
-            return CreatedAtAction(nameof(GetById), new { id = user.UserId }, user);
-        }
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        // ============================================================
-        //  PUT api/users/{id}
-        //  Updates an existing user
-        // ============================================================
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(Guid id, Users updatedUser)
-        {
-            if (id != updatedUser.UserId)
-                return BadRequest("Users ID in the URL does not match the request body.");
+        var user = await _userRepository.GetByIdAsync(id);
 
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+        if (user == null)
+            return NotFound($"User with ID {id} was not found.");
 
-            var user = await _context.Users.FindAsync(id);
+        _mapper.Map(dto, user);
+        await _userRepository.UpdateAsync(user);
 
-            if (user == null)
-                return NotFound($"Users with ID {id} was not found.");
+        return NoContent();
+    }
 
-            user.Username = updatedUser.Username;
-            user.Email = updatedUser.Email;
-            user.TotalPointsEarned = updatedUser.TotalPointsEarned;
-            user.CurrentBalance = updatedUser.CurrentBalance;
-            user.Level = updatedUser.Level;
-            user.Xp = updatedUser.Xp;
+    [HttpPatch("{id}/addpoints/{points}")]
+    public async Task<IActionResult> AddPoints(Guid id, int points)
+    {
+        if (points <= 0)
+            return BadRequest("Points must be a positive number.");
 
-            await _context.SaveChangesAsync();
+        var success = await _userRepository.AddPointsAsync(id, points);
 
-            return NoContent();
-        }
+        if (!success)
+            return NotFound($"User with ID {id} was not found.");
 
-        // ============================================================
-        //  PATCH api/users/{id}/addpoints/{points}
-        //  Adds points to a user's balance and total earned
-        // ============================================================
-        [HttpPatch("{id}/addpoints/{points}")]
-        public async Task<IActionResult> AddPoints(Guid id, int points)
-        {
-            if (points <= 0)
-                return BadRequest("Points must be a positive number.");
+        return NoContent();
+    }
 
-            var user = await _context.Users.FindAsync(id);
+    [HttpPatch("{id}/spendpoints/{points}")]
+    public async Task<IActionResult> SpendPoints(Guid id, int points)
+    {
+        if (points <= 0)
+            return BadRequest("Points must be a positive number.");
 
-            if (user == null)
-                return NotFound($"Users with ID {id} was not found.");
+        var success = await _userRepository.SpendPointsAsync(id, points);
 
-            user.CurrentBalance += points;
-            user.TotalPointsEarned += points;
+        if (!success)
+            return NotFound($"User with ID {id} was not found or has insufficient balance.");
 
-            await _context.SaveChangesAsync();
+        return NoContent();
+    }
 
-            return NoContent();
-        }
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var success = await _userRepository.DeleteAsync(id);
 
-        // ============================================================
-        //  PATCH api/users/{id}/spendpoints/{points}
-        //  Deducts points from a user's balance
-        // ============================================================
-        [HttpPatch("{id}/spendpoints/{points}")]
-        public async Task<IActionResult> SpendPoints(Guid id, int points)
-        {
-            if (points <= 0)
-                return BadRequest("Points must be a positive number.");
+        if (!success)
+            return NotFound($"User with ID {id} was not found.");
 
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound($"Users with ID {id} was not found.");
-
-            if (user.CurrentBalance < points)
-                return BadRequest("Insufficient balance.");
-
-            user.CurrentBalance -= points;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // ============================================================
-        //  DELETE api/users/{id}
-        //  Deletes a user
-        // ============================================================
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(Guid id)
-        {
-            var user = await _context.Users.FindAsync(id);
-
-            if (user == null)
-                return NotFound($"Users with ID {id} was not found.");
-
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+        return NoContent();
     }
 }

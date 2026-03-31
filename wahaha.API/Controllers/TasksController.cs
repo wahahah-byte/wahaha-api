@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using wahaha.API.Data;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
+using wahaha.API.Models.DTOs;
+using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.Controllers;
 
@@ -9,158 +10,97 @@ namespace wahaha.API.Controllers;
 [Route("api/[controller]")]
 public class TasksController : ControllerBase
 {
-    private readonly WahahaDbContext _context;
+    private readonly ITaskRepository _taskRepository;
+    private readonly IMapper _mapper;
 
-    public TasksController(WahahaDbContext context)
+    public TasksController(ITaskRepository taskRepository, IMapper mapper)
     {
-        _context = context;
+        _taskRepository = taskRepository;
+        _mapper = mapper;
     }
 
-    // ============================================================
-    //  GET api/tasks
-    //  Returns all tasks
-    // ============================================================
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Models.Domain.Task>>> GetAll()
+    public async Task<ActionResult<IEnumerable<TaskDto>>> GetAll()
     {
-        var tasks = await _context.Tasks.ToListAsync();
-        return Ok(tasks);
+        var tasks = await _taskRepository.GetAllAsync();
+        return Ok(_mapper.Map<IEnumerable<TaskDto>>(tasks));
     }
 
-    // ============================================================
-    //  GET api/tasks/{id}
-    //  Returns a single task by ID
-    // ============================================================
     [HttpGet("{id}")]
-    public async Task<ActionResult<Models.Domain.Task>> GetById(Guid id)
+    public async Task<ActionResult<TaskDto>> GetById(Guid id)
     {
-        var task = await _context.Tasks.FindAsync(id);
+        var task = await _taskRepository.GetByIdAsync(id);
 
         if (task == null)
             return NotFound($"Task with ID {id} was not found.");
 
-        return Ok(task);
+        return Ok(_mapper.Map<TaskDto>(task));
     }
 
-    // ============================================================
-    //  GET api/tasks/user/{userId}
-    //  Returns all tasks belonging to a specific user
-    // ============================================================
     [HttpGet("user/{userId}")]
-    public async Task<ActionResult<IEnumerable<Models.Domain.Task>>> GetByUser(Guid userId)
+    public async Task<ActionResult<IEnumerable<TaskDto>>> GetByUser(Guid userId)
     {
-        var tasks = await _context.Tasks
-            .Where(t => t.UserId == userId)
-            .ToListAsync();
-
-        return Ok(tasks);
+        var tasks = await _taskRepository.GetByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<TaskDto>>(tasks));
     }
 
-    // ============================================================
-    //  GET api/tasks/user/{userId}/pending
-    //  Returns all pending tasks for a user ordered by priority
-    // ============================================================
     [HttpGet("user/{userId}/pending")]
-    public async Task<ActionResult<IEnumerable<Models.Domain.Task>>> GetPendingByUser(Guid userId)
+    public async Task<ActionResult<IEnumerable<TaskDto>>> GetPendingByUser(Guid userId)
     {
-        var tasks = await _context.Tasks
-            .Where(t => t.UserId == userId && t.Status == ByteTaskStatus.pending)
-            .OrderByDescending(t => t.Priority)
-            .ToListAsync();
-
-        return Ok(tasks);
+        var tasks = await _taskRepository.GetPendingByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<TaskDto>>(tasks));
     }
 
-    // ============================================================
-    //  POST api/tasks
-    //  Creates a new task
-    // ============================================================
     [HttpPost]
-    public async Task<ActionResult<Models.Domain.Task>> Create(Models.Domain.Task task)
+    public async Task<ActionResult<TaskDto>> Create(CreateTaskDto dto)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        task.TaskId = Guid.NewGuid();
-        task.CreatedAt = DateTime.UtcNow;
+        var task = _mapper.Map<Models.Domain.Task>(dto);
+        var created = await _taskRepository.CreateAsync(task);
 
-        _context.Tasks.Add(task);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetById), new { id = task.TaskId }, task);
+        return CreatedAtAction(nameof(GetById), new { id = created.TaskId }, _mapper.Map<TaskDto>(created));
     }
 
-    // ============================================================
-    //  PUT api/tasks/{id}
-    //  Updates an existing task
-    // ============================================================
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, wahaha.API.Models.Domain.Task updatedTask)
+    public async Task<IActionResult> Update(Guid id, UpdateTaskDto dto)
     {
-        if (id != updatedTask.TaskId)
+        if (id != dto.TaskId)
             return BadRequest("Task ID in the URL does not match the request body.");
 
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var task = await _context.Tasks.FindAsync(id);
+        var task = await _taskRepository.GetByIdAsync(id);
 
         if (task == null)
             return NotFound($"Task with ID {id} was not found.");
 
-        task.Title = updatedTask.Title;
-        task.Description = updatedTask.Description;
-        task.Category = updatedTask.Category;
-        task.Priority = updatedTask.Priority;
-        task.Status = updatedTask.Status;
-        task.PointValue = updatedTask.PointValue;
-        task.DueDate = updatedTask.DueDate;
-        task.CompletedAt = updatedTask.CompletedAt;
-        task.IsRecurring = updatedTask.IsRecurring;
-        task.RecurrenceRule = updatedTask.RecurrenceRule;
-
-        await _context.SaveChangesAsync();
+        _mapper.Map(dto, task);
+        await _taskRepository.UpdateAsync(task);
 
         return NoContent();
     }
 
-    // ============================================================
-    //  PATCH api/tasks/{id}/complete
-    //  Marks a task as completed and stamps the completed_at date
-    // ============================================================
     [HttpPatch("{id}/complete")]
     public async Task<IActionResult> Complete(Guid id)
     {
-        var task = await _context.Tasks.FindAsync(id);
+        var success = await _taskRepository.CompleteAsync(id);
 
-        if (task == null)
-            return NotFound($"Task with ID {id} was not found.");
-
-        if (task.Status == ByteTaskStatus.completed)
-            return BadRequest("Task is already completed.");
-
-        task.Status = ByteTaskStatus.completed;
-        task.CompletedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
+        if (!success)
+            return NotFound($"Task with ID {id} was not found or is already completed.");
 
         return NoContent();
     }
 
-    // ============================================================
-    //  DELETE api/tasks/{id}
-    //  Deletes a task
-    // ============================================================
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var task = await _context.Tasks.FindAsync(id);
+        var success = await _taskRepository.DeleteAsync(id);
 
-        if (task == null)
+        if (!success)
             return NotFound($"Task with ID {id} was not found.");
-
-        _context.Tasks.Remove(task);
-        await _context.SaveChangesAsync();
 
         return NoContent();
     }

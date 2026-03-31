@@ -1,112 +1,76 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using wahaha.API.Data;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
+using wahaha.API.Models.DTOs;
+using wahaha.API.Repositories.Interfaces;
 
-namespace wahaha.API.Controllers
+namespace wahaha.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class PointTransactionsController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class PointTransactionsController : ControllerBase
+    private readonly IPointTransactionRepository _pointTransactionRepository;
+    private readonly IMapper _mapper;
+
+    public PointTransactionsController(IPointTransactionRepository pointTransactionRepository, IMapper mapper)
     {
-        private readonly WahahaDbContext _context;
+        _pointTransactionRepository = pointTransactionRepository;
+        _mapper = mapper;
+    }
 
-        public PointTransactionsController(WahahaDbContext context)
-        {
-            _context = context;
-        }
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetAll()
+    {
+        var transactions = await _pointTransactionRepository.GetAllAsync();
+        return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
+    }
 
-        // ============================================================
-        //  GET api/pointtransactions
-        //  Returns all transactions
-        // ============================================================
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<PointTransaction>>> GetAll()
-        {
-            var transactions = await _context.PointTransactions.ToListAsync();
-            return Ok(transactions);
-        }
+    [HttpGet("{id}")]
+    public async Task<ActionResult<PointTransactionDto>> GetById(int id)
+    {
+        var transaction = await _pointTransactionRepository.GetByIdAsync(id);
 
-        // ============================================================
-        //  GET api/pointtransactions/{id}
-        //  Returns a single transaction by ID
-        // ============================================================
-        [HttpGet("{id}")]
-        public async Task<ActionResult<PointTransaction>> GetById(Guid id)
-        {
-            var transaction = await _context.PointTransactions.FindAsync(id);
+        if (transaction == null)
+            return NotFound($"Transaction with ID {id} was not found.");
 
-            if (transaction == null)
-                return NotFound($"Transaction with ID {id} was not found.");
+        return Ok(_mapper.Map<PointTransactionDto>(transaction));
+    }
 
-            return Ok(transaction);
-        }
+    [HttpGet("user/{userId}")]
+    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetByUser(Guid userId)
+    {
+        var transactions = await _pointTransactionRepository.GetByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
+    }
 
-        // ============================================================
-        //  GET api/pointtransactions/user/{userId}
-        //  Returns all transactions for a specific user
-        // ============================================================
-        [HttpGet("user/{userId}")]
-        public async Task<ActionResult<IEnumerable<PointTransaction>>> GetByUser(Guid userId)
-        {
-            var transactions = await _context.PointTransactions
-                .Where(pt => pt.UserId == userId)
-                .OrderByDescending(pt => pt.CreatedAt)
-                .ToListAsync();
+    [HttpGet("user/{userId}/type/{type}")]
+    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetByUserAndType(Guid userId, TransactionType type)
+    {
+        var transactions = await _pointTransactionRepository.GetByUserAndTypeAsync(userId, type);
+        return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
+    }
 
-            return Ok(transactions);
-        }
+    [HttpPost]
+    public async Task<ActionResult<PointTransactionDto>> Create(CreatePointTransactionDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        // ============================================================
-        //  GET api/pointtransactions/user/{userId}/type/{type}
-        //  Returns transactions for a user filtered by type (EARN/SPEND/BONUS)
-        // ============================================================
-        [HttpGet("user/{userId}/type/{type}")]
-        public async Task<ActionResult<IEnumerable<PointTransaction>>> GetByUserAndType(Guid userId, TransactionType type)
-        {
-            var transactions = await _context.PointTransactions
-                .Where(pt => pt.UserId == userId && pt.Type == type)
-                .OrderByDescending(pt => pt.CreatedAt)
-                .ToListAsync();
+        var transaction = _mapper.Map<PointTransaction>(dto);
+        var created = await _pointTransactionRepository.CreateAsync(transaction);
 
-            return Ok(transactions);
-        }
+        return CreatedAtAction(nameof(GetById), new { id = created.TransactionId }, _mapper.Map<PointTransactionDto>(created));
+    }
 
-        // ============================================================
-        //  POST api/pointtransactions
-        //  Creates a new transaction
-        // ============================================================
-        [HttpPost]
-        public async Task<ActionResult<PointTransaction>> Create(PointTransaction transaction)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var success = await _pointTransactionRepository.DeleteAsync(id);
 
-            transaction.TransactionId = Guid.NewGuid();
-            transaction.CreatedAt = DateTime.UtcNow;
+        if (!success)
+            return NotFound($"Transaction with ID {id} was not found.");
 
-            _context.PointTransactions.Add(transaction);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetById), new { id = transaction.TransactionId }, transaction);
-        }
-
-        // ============================================================
-        //  DELETE api/pointtransactions/{id}
-        //  Deletes a transaction
-        // ============================================================
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(Guid id)
-        {
-            var transaction = await _context.PointTransactions.FindAsync(id);
-
-            if (transaction == null)
-                return NotFound($"Transaction with ID {id} was not found.");
-
-            _context.PointTransactions.Remove(transaction);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+        return NoContent();
     }
 }

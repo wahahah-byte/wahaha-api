@@ -1,174 +1,98 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using wahaha.API.Data;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
+using wahaha.API.Models.DTO;
+using wahaha.API.Repositories.Interfaces;
 
-namespace wahaha.API.Controllers
+namespace wahaha.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class StreaksController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class StreaksController : ControllerBase
+    private readonly IStreakRepository _streakRepository;
+    private readonly IMapper _mapper;
+
+    public StreaksController(IStreakRepository streakRepository, IMapper mapper)
     {
-        private readonly WahahaDbContext _context;
+        _streakRepository = streakRepository;
+        _mapper = mapper;
+    }
 
-        public StreaksController(WahahaDbContext context)
-        {
-            _context = context;
-        }
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<StreakDto>>> GetAll()
+    {
+        var streaks = await _streakRepository.GetAllAsync();
+        return Ok(_mapper.Map<IEnumerable<StreakDto>>(streaks));
+    }
 
-        // ============================================================
-        //  GET api/streaks
-        //  Returns all streaks
-        // ============================================================
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Streak>>> GetAll()
-        {
-            var streaks = await _context.Streaks.ToListAsync();
-            return Ok(streaks);
-        }
+    [HttpGet("{id}")]
+    public async Task<ActionResult<StreakDto>> GetById(int id)
+    {
+        var streak = await _streakRepository.GetByIdAsync(id);
 
-        // ============================================================
-        //  GET api/streaks/{id}
-        //  Returns a single streak by ID
-        // ============================================================
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Streak>> GetById(Guid id)
-        {
-            var streak = await _context.Streaks.FindAsync(id);
+        if (streak == null)
+            return NotFound($"Streak with ID {id} was not found.");
 
-            if (streak == null)
-                return NotFound($"Streak with ID {id} was not found.");
+        return Ok(_mapper.Map<StreakDto>(streak));
+    }
 
-            return Ok(streak);
-        }
+    [HttpGet("user/{userId}")]
+    public async Task<ActionResult<IEnumerable<StreakDto>>> GetByUser(Guid userId)
+    {
+        var streaks = await _streakRepository.GetByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<StreakDto>>(streaks));
+    }
 
-        // ============================================================
-        //  GET api/streaks/user/{userId}
-        //  Returns all streaks for a specific user
-        // ============================================================
-        [HttpGet("user/{userId}")]
-        public async Task<ActionResult<IEnumerable<Streak>>> GetByUser(Guid userId)
-        {
-            var streaks = await _context.Streaks
-                .Where(s => s.UserId == userId)
-                .OrderByDescending(s => s.CurrentCount)
-                .ToListAsync();
+    [HttpGet("user/{userId}/active")]
+    public async Task<ActionResult<IEnumerable<StreakDto>>> GetActiveByUser(Guid userId)
+    {
+        var streaks = await _streakRepository.GetActiveByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<StreakDto>>(streaks));
+    }
 
-            return Ok(streaks);
-        }
+    [HttpPost]
+    public async Task<ActionResult<StreakDto>> Create(CreateStreakDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        // ============================================================
-        //  GET api/streaks/user/{userId}/active
-        //  Returns only active streaks for a specific user
-        // ============================================================
-        [HttpGet("user/{userId}/active")]
-        public async Task<ActionResult<IEnumerable<Streak>>> GetActiveByUser(Guid userId)
-        {
-            var streaks = await _context.Streaks
-                .Where(s => s.UserId == userId && s.IsActive)
-                .OrderByDescending(s => s.CurrentCount)
-                .ToListAsync();
+        var streak = _mapper.Map<Streak>(dto);
+        var created = await _streakRepository.CreateAsync(streak);
 
-            return Ok(streaks);
-        }
+        return CreatedAtAction(nameof(GetById), new { id = created.StreakId }, _mapper.Map<StreakDto>(created));
+    }
 
-        // ============================================================
-        //  POST api/streaks
-        //  Creates a new streak for a user
-        // ============================================================
-        [HttpPost]
-        public async Task<ActionResult<Streak>> Create(Streak streak)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+    [HttpPatch("{id}/increment")]
+    public async Task<IActionResult> Increment(int id)
+    {
+        var success = await _streakRepository.IncrementAsync(id);
 
-            // Check if streak type already exists for this user
-            var exists = await _context.Streaks
-                .AnyAsync(s => s.UserId == streak.UserId && s.StreakType == streak.StreakType);
+        if (!success)
+            return NotFound($"Streak with ID {id} was not found.");
 
-            if (exists)
-                return BadRequest($"A '{streak.StreakType}' streak already exists for this user.");
+        return NoContent();
+    }
 
-            streak.StreakId = Guid.NewGuid();
-            streak.LastActivityDate = DateTime.UtcNow;
+    [HttpPatch("{id}/reset")]
+    public async Task<IActionResult> Reset(int id)
+    {
+        var success = await _streakRepository.ResetAsync(id);
 
-            _context.Streaks.Add(streak);
-            await _context.SaveChangesAsync();
+        if (!success)
+            return NotFound($"Streak with ID {id} was not found.");
 
-            return CreatedAtAction(nameof(GetById), new { id = streak.StreakId }, streak);
-        }
+        return NoContent();
+    }
 
-        // ============================================================
-        //  PATCH api/streaks/{id}/increment
-        //  Increments a streak count by 1 and updates the multiplier
-        // ============================================================
-        [HttpPatch("{id}/increment")]
-        public async Task<IActionResult> Increment(Guid id)
-        {
-            var streak = await _context.Streaks.FindAsync(id);
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var success = await _streakRepository.DeleteAsync(id);
 
-            if (streak == null)
-                return NotFound($"Streak with ID {id} was not found.");
+        if (!success)
+            return NotFound($"Streak with ID {id} was not found.");
 
-            streak.CurrentCount++;
-            streak.LastActivityDate = DateTime.UtcNow;
-            streak.IsActive = true;
-
-            if (streak.CurrentCount > streak.LongestCount)
-                streak.LongestCount = streak.CurrentCount;
-
-            // Update bonus multiplier based on count milestones
-            streak.BonusMultiplier = streak.CurrentCount switch
-            {
-                >= 30 => 2.0m,
-                >= 14 => 1.8m,
-                >= 7 => 1.5m,
-                >= 3 => 1.2m,
-                _ => 1.0m
-            };
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // ============================================================
-        //  PATCH api/streaks/{id}/reset
-        //  Resets a streak back to 0 (e.g. missed a day)
-        // ============================================================
-        [HttpPatch("{id}/reset")]
-        public async Task<IActionResult> Reset(Guid id)
-        {
-            var streak = await _context.Streaks.FindAsync(id);
-
-            if (streak == null)
-                return NotFound($"Streak with ID {id} was not found.");
-
-            streak.CurrentCount = 0;
-            streak.BonusMultiplier = 1.0m;
-            streak.IsActive = false;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // ============================================================
-        //  DELETE api/streaks/{id}
-        //  Deletes a streak
-        // ============================================================
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(Guid id)
-        {
-            var streak = await _context.Streaks.FindAsync(id);
-
-            if (streak == null)
-                return NotFound($"Streak with ID {id} was not found.");
-
-            _context.Streaks.Remove(streak);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+        return NoContent();
     }
 }

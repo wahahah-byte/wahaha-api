@@ -1,169 +1,98 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using wahaha.API.Data;
+using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
+using wahaha.API.Models.DTOs;
+using wahaha.API.Repositories.Interfaces;
 
-namespace wahaha.API.Controllers
+namespace wahaha.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class UserInventoryController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class UserInventoryController : ControllerBase
+    private readonly IUserInventoryRepository _inventoryRepository;
+    private readonly IMapper _mapper;
+
+    public UserInventoryController(IUserInventoryRepository inventoryRepository, IMapper mapper)
     {
-        private readonly WahahaDbContext _context;
+        _inventoryRepository = inventoryRepository;
+        _mapper = mapper;
+    }
 
-        public UserInventoryController(WahahaDbContext context)
-        {
-            _context = context;
-        }
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<UserInventoryDto>>> GetAll()
+    {
+        var inventory = await _inventoryRepository.GetAllAsync();
+        return Ok(_mapper.Map<IEnumerable<UserInventoryDto>>(inventory));
+    }
 
-        // ============================================================
-        //  GET api/userinventory
-        //  Returns all inventory entries
-        // ============================================================
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<UserInventory>>> GetAll()
-        {
-            var inventory = await _context.UserInventories.ToListAsync();
-            return Ok(inventory);
-        }
+    [HttpGet("{id}")]
+    public async Task<ActionResult<UserInventoryDto>> GetById(int id)
+    {
+        var entry = await _inventoryRepository.GetByIdAsync(id);
 
-        // ============================================================
-        //  GET api/userinventory/{id}
-        //  Returns a single inventory entry by ID
-        // ============================================================
-        [HttpGet("{id}")]
-        public async Task<ActionResult<UserInventory>> GetById(int id)
-        {
-            var entry = await _context.UserInventories.FindAsync(id);
+        if (entry == null)
+            return NotFound($"Inventory entry with ID {id} was not found.");
 
-            if (entry == null)
-                return NotFound($"Inventory entry with ID {id} was not found.");
+        return Ok(_mapper.Map<UserInventoryDto>(entry));
+    }
 
-            return Ok(entry);
-        }
+    [HttpGet("user/{userId}")]
+    public async Task<ActionResult<IEnumerable<UserInventoryDto>>> GetByUser(Guid userId)
+    {
+        var inventory = await _inventoryRepository.GetByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<UserInventoryDto>>(inventory));
+    }
 
-        // ============================================================
-        //  GET api/userinventory/user/{userId}
-        //  Returns all items owned by a specific user
-        // ============================================================
-        [HttpGet("user/{userId}")]
-        public async Task<ActionResult<IEnumerable<UserInventory>>> GetByUser(Guid userId)
-        {
-            var inventory = await _context.UserInventories
-                .Where(i => i.UserId == userId)
-                .Include(i => i.AvatarItem)
-                .ToListAsync();
+    [HttpGet("user/{userId}/equipped")]
+    public async Task<ActionResult<IEnumerable<UserInventoryDto>>> GetEquipped(Guid userId)
+    {
+        var equipped = await _inventoryRepository.GetEquippedByUserAsync(userId);
+        return Ok(_mapper.Map<IEnumerable<UserInventoryDto>>(equipped));
+    }
 
-            return Ok(inventory);
-        }
+    [HttpPost]
+    public async Task<ActionResult<UserInventoryDto>> Create(CreateUserInventoryDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
 
-        // ============================================================
-        //  GET api/userinventory/user/{userId}/equipped
-        //  Returns all currently equipped items for a user
-        // ============================================================
-        [HttpGet("user/{userId}/equipped")]
-        public async Task<ActionResult<IEnumerable<UserInventory>>> GetEquipped(Guid userId)
-        {
-            var equipped = await _context.UserInventories
-                .Where(i => i.UserId == userId && i.IsEquipped)
-                .Include(i => i.AvatarItem)
-                .ToListAsync();
+        var entry = _mapper.Map<UserInventory>(dto);
+        var created = await _inventoryRepository.CreateAsync(entry);
 
-            return Ok(equipped);
-        }
+        return CreatedAtAction(nameof(GetById), new { id = created.InventoryId }, _mapper.Map<UserInventoryDto>(created));
+    }
 
-        // ============================================================
-        //  POST api/userinventory
-        //  Adds an item to a user's inventory (purchase)
-        // ============================================================
-        [HttpPost]
-        public async Task<ActionResult<UserInventory>> Create(UserInventory entry)
-        {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+    [HttpPatch("{id}/equip")]
+    public async Task<IActionResult> Equip(int id)
+    {
+        var success = await _inventoryRepository.EquipAsync(id);
 
-            // Check item is not already owned
-            var alreadyOwned = await _context.UserInventories
-                .AnyAsync(i => i.UserId == entry.UserId && i.ItemId == entry.ItemId);
+        if (!success)
+            return NotFound($"Inventory entry with ID {id} was not found.");
 
-            if (alreadyOwned)
-                return BadRequest("User already owns this item.");
+        return NoContent();
+    }
 
-            entry.AcquiredAt = DateTime.UtcNow;
+    [HttpPatch("{id}/unequip")]
+    public async Task<IActionResult> Unequip(int id)
+    {
+        var success = await _inventoryRepository.UnequipAsync(id);
 
-            _context.UserInventories.Add(entry);
-            await _context.SaveChangesAsync();
+        if (!success)
+            return NotFound($"Inventory entry with ID {id} was not found.");
 
-            return CreatedAtAction(nameof(GetById), new { id = entry.InventoryId }, entry);
-        }
+        return NoContent();
+    }
 
-        // ============================================================
-        //  PATCH api/userinventory/{id}/equip
-        //  Equips an item (and unequips any other item in the same slot)
-        // ============================================================
-        [HttpPatch("{id}/equip")]
-        public async Task<IActionResult> Equip(int id)
-        {
-            var entry = await _context.UserInventories
-                .Include(i => i.AvatarItem)
-                .FirstOrDefaultAsync(i => i.InventoryId == id);
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var success = await _inventoryRepository.DeleteAsync(id);
 
-            if (entry == null)
-                return NotFound($"Inventory entry with ID {id} was not found.");
+        if (!success)
+            return NotFound($"Inventory entry with ID {id} was not found.");
 
-            // Unequip any item already in the same slot for this user
-            var sameSlotItems = await _context.UserInventories
-                .Where(i => i.UserId == entry.UserId
-                         && i.IsEquipped
-                         && i.AvatarItem!.Slot == entry.AvatarItem!.Slot
-                         && i.InventoryId != id)
-                .ToListAsync();
-
-            foreach (var other in sameSlotItems)
-                other.IsEquipped = false;
-
-            entry.IsEquipped = true;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // ============================================================
-        //  PATCH api/userinventory/{id}/unequip
-        //  Unequips an item
-        // ============================================================
-        [HttpPatch("{id}/unequip")]
-        public async Task<IActionResult> Unequip(int id)
-        {
-            var entry = await _context.UserInventories.FindAsync(id);
-
-            if (entry == null)
-                return NotFound($"Inventory entry with ID {id} was not found.");
-
-            entry.IsEquipped = false;
-
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        // ============================================================
-        //  DELETE api/userinventory/{id}
-        //  Removes an item from a user's inventory
-        // ============================================================
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            var entry = await _context.UserInventories.FindAsync(id);
-
-            if (entry == null)
-                return NotFound($"Inventory entry with ID {id} was not found.");
-
-            _context.UserInventories.Remove(entry);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
+        return NoContent();
     }
 }
