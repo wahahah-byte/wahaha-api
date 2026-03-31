@@ -7,7 +7,7 @@ public class Streak
 {
     [Key]
     [Column("streak_id")]
-    public Guid StreakId { get; set; } = Guid.NewGuid();
+    public int StreakId { get; set; }
 
     [Required]
     [Column("user_id")]

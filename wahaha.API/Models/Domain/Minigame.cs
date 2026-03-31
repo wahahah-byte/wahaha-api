@@ -7,7 +7,7 @@ public class Minigame
 {
     [Key]
     [Column("game_id")]
-    public Guid GameId { get; set; } = Guid.NewGuid();
+    public int GameId { get; set; }
 
     [Required]
     [MaxLength(100)]

@@ -7,7 +7,7 @@ public class MinigameSession
 {
     [Key]
     [Column("session_id")]
-    public Guid SessionId { get; set; } = Guid.NewGuid();
+    public int SessionId { get; set; }
 
     [Required]
     [Column("user_id")]
@@ -15,7 +15,7 @@ public class MinigameSession
 
     [Required]
     [Column("game_id")]
-    public Guid GameId { get; set; }
+    public int GameId { get; set; }
 
     [Column("score")]
     [Range(0, int.MaxValue)]
