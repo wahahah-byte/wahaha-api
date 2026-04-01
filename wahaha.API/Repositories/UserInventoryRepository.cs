@@ -9,6 +9,15 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
 {
     public UserInventoryRepository(WahahaDbContext context) : base(context) { }
 
+    public override async Task<IEnumerable<UserInventory>> GetAllAsync()
+        => await _dbSet
+            .Include(i => i.AvatarItem)
+            .ToListAsync();
+    public override async Task<UserInventory?> GetByIdAsync(int id)
+    => await _dbSet
+        .Include(i => i.AvatarItem)
+        .FirstOrDefaultAsync(i => i.InventoryId == id);
+
     public async Task<IEnumerable<UserInventory>> GetByUserAsync(Guid userId)
         => await _dbSet
             .Where(i => i.UserId == userId)
@@ -29,7 +38,6 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
 
         if (entry == null) return false;
 
-        // Unequip any item already in the same slot for this user
         var sameSlotItems = await _dbSet
             .Where(i => i.UserId == entry.UserId
                      && i.IsEquipped

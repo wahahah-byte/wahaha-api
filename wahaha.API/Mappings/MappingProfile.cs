@@ -37,10 +37,13 @@ public class MappingProfile : Profile
 
         // MinigameSession
         CreateMap<MinigameSession, MinigameSessionDto>()
-            .ForMember(dest => dest.Outcome, opt => opt.MapFrom(src => src.Outcome.ToString()));
+            .ForMember(dest => dest.Outcome, opt => opt.MapFrom(src => src.Outcome.ToString()))
+            .ForMember(dest => dest.GameName, opt => opt.MapFrom(src => src.Minigame != null ? src.Minigame.Name : null))
+            .ForMember(dest => dest.Username, opt => opt.MapFrom(src => src.User != null ? src.User.Username : null));
 
         CreateMap<MinigameSession, MinigameSessionLeaderboardDto>()
             .ForMember(dest => dest.Outcome, opt => opt.MapFrom(src => src.Outcome.ToString()))
+            .ForMember(dest => dest.GameName, opt => opt.MapFrom(src => src.Minigame != null ? src.Minigame.Name : null))
             .ForMember(dest => dest.Username, opt => opt.MapFrom(src => src.User != null ? src.User.Username : string.Empty));
 
         CreateMap<CreateMinigameSessionDto, MinigameSession>()
@@ -80,7 +83,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => Enum.Parse<ByteTaskStatus>(src.Status, true)));
 
         // UserInventory
-        CreateMap<UserInventory, UserInventoryDto>();
+        CreateMap<UserInventory, UserInventoryDto>()
+    .ForMember(dest => dest.AvatarItem, opt => opt.MapFrom(src => src.AvatarItem));
         CreateMap<CreateUserInventoryDto, UserInventory>()
             .ForMember(dest => dest.AcquiredAt, opt => opt.MapFrom(src => DateTime.UtcNow));
 

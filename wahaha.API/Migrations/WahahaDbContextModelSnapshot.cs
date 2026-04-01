@@ -73,7 +73,7 @@ namespace wahaha.API.Migrations
 
                     b.HasKey("ItemId");
 
-                    b.ToTable("avatar_items");
+                    b.ToTable("avatar_items", (string)null);
 
                     b.HasData(
                         new
@@ -298,7 +298,7 @@ namespace wahaha.API.Migrations
 
                     b.HasKey("GameId");
 
-                    b.ToTable("minigames");
+                    b.ToTable("minigames", (string)null);
 
                     b.HasData(
                         new
@@ -435,7 +435,7 @@ namespace wahaha.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("minigame_sessions");
+                    b.ToTable("minigame_sessions", (string)null);
                 });
 
             modelBuilder.Entity("wahaha.API.Models.Domain.PointTransaction", b =>
@@ -481,7 +481,7 @@ namespace wahaha.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("point_transactions");
+                    b.ToTable("point_transactions", (string)null);
 
                     b.HasData(
                         new
@@ -649,7 +649,7 @@ namespace wahaha.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("streaks");
+                    b.ToTable("streaks", (string)null);
 
                     b.HasData(
                         new
@@ -765,7 +765,7 @@ namespace wahaha.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("tasks");
+                    b.ToTable("tasks", (string)null);
 
                     b.HasData(
                         new
@@ -898,7 +898,7 @@ namespace wahaha.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("user_inventory");
+                    b.ToTable("user_inventory", (string)null);
                 });
 
             modelBuilder.Entity("wahaha.API.Models.Domain.Users", b =>
@@ -942,7 +942,7 @@ namespace wahaha.API.Migrations
 
                     b.HasKey("UserId");
 
-                    b.ToTable("users");
+                    b.ToTable("users", (string)null);
 
                     b.HasData(
                         new
