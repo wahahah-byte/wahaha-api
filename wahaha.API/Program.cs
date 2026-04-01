@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using wahaha.API.Data;
-using wahaha.API.Mappings;
 using wahaha.API.Repositories;
 using wahaha.API.Repositories.Interfaces;
 

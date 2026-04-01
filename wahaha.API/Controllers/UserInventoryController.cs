@@ -33,7 +33,7 @@ public class UserInventoryController : ControllerBase
 
         if (entry == null)
             return NotFound($"Inventory entry with ID {id} was not found.");
-
+   
         return Ok(_mapper.Map<UserInventoryDto>(entry));
     }
 

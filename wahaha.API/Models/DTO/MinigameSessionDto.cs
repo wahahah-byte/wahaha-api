@@ -4,7 +4,9 @@ public class MinigameSessionDto
 {
     public int SessionId { get; set; }
     public Guid UserId { get; set; }
+    public string? Username { get; set; }
     public int GameId { get; set; }
+    public string? GameName { get; set; }
     public int? Score { get; set; }
     public int PointsEarned { get; set; }
     public DateTime PlayedAt { get; set; }
@@ -18,6 +20,7 @@ public class MinigameSessionLeaderboardDto
     public Guid UserId { get; set; }
     public string Username { get; set; } = string.Empty;
     public int GameId { get; set; }
+    public string? GameName { get; set; }
     public int? Score { get; set; }
     public int PointsEarned { get; set; }
     public DateTime PlayedAt { get; set; }
