@@ -1,7 +1,11 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using wahaha.API.Models.Auth;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTOs;
+using wahaha.API.Models.Filters;
+using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.Controllers;
@@ -19,13 +23,23 @@ public class AvatarItemsController : ControllerBase
         _mapper = mapper;
     }
 
+    // Public — anyone can browse the shop
+    [AllowAnonymous]
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AvatarItemDto>>> GetAll()
+    public async Task<ActionResult<PagedResult<AvatarItemDto>>> GetAll([FromQuery] AvatarItemFilterParams filters)
     {
-        var items = await _avatarItemRepository.GetAllAsync();
-        return Ok(_mapper.Map<IEnumerable<AvatarItemDto>>(items));
+        var result = await _avatarItemRepository.GetFilteredAsync(filters);
+
+        return Ok(new PagedResult<AvatarItemDto>
+        {
+            Data = _mapper.Map<IEnumerable<AvatarItemDto>>(result.Data),
+            PageNumber = result.PageNumber,
+            PageSize = result.PageSize,
+            TotalCount = result.TotalCount
+        });
     }
 
+    [AllowAnonymous]
     [HttpGet("{id}")]
     public async Task<ActionResult<AvatarItemDto>> GetById(int id)
     {
@@ -37,6 +51,7 @@ public class AvatarItemsController : ControllerBase
         return Ok(_mapper.Map<AvatarItemDto>(item));
     }
 
+    [AllowAnonymous]
     [HttpGet("rarity/{rarity}")]
     public async Task<ActionResult<IEnumerable<AvatarItemDto>>> GetByRarity(Rarity rarity)
     {
@@ -44,6 +59,7 @@ public class AvatarItemsController : ControllerBase
         return Ok(_mapper.Map<IEnumerable<AvatarItemDto>>(items));
     }
 
+    [AllowAnonymous]
     [HttpGet("slot/{slot}")]
     public async Task<ActionResult<IEnumerable<AvatarItemDto>>> GetBySlot(ItemSlot slot)
     {
@@ -51,26 +67,23 @@ public class AvatarItemsController : ControllerBase
         return Ok(_mapper.Map<IEnumerable<AvatarItemDto>>(items));
     }
 
+    // Admin and Moderator can create and update items
+    [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
     [HttpPost]
     public async Task<ActionResult<AvatarItemDto>> Create(CreateAvatarItemDto dto)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
         var item = _mapper.Map<AvatarItem>(dto);
         var created = await _avatarItemRepository.CreateAsync(item);
 
         return CreatedAtAction(nameof(GetById), new { id = created.ItemId }, _mapper.Map<AvatarItemDto>(created));
     }
 
+    [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, UpdateAvatarItemDto dto)
     {
         if (id != dto.ItemId)
             return BadRequest("Item ID in the URL does not match the request body.");
-
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
 
         var item = await _avatarItemRepository.GetByIdAsync(id);
 
@@ -83,6 +96,7 @@ public class AvatarItemsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
     [HttpPatch("{id}/toggleavailability")]
     public async Task<IActionResult> ToggleAvailability(int id)
     {
@@ -94,6 +108,8 @@ public class AvatarItemsController : ControllerBase
         return NoContent();
     }
 
+    // Only Admin can delete items
+    [Authorize(Roles = WahahaUserRoles.Admin)]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {

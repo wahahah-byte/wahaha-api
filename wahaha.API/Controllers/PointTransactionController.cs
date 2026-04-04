@@ -1,11 +1,15 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTOs;
+using wahaha.API.Models.Filters;
+using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class PointTransactionsController : ControllerBase
@@ -19,11 +23,25 @@ public class PointTransactionsController : ControllerBase
         _mapper = mapper;
     }
 
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetAll()
+    private Guid GetCurrentUserId()
     {
-        var transactions = await _pointTransactionRepository.GetAllAsync();
-        return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
+        var claim = User.FindFirst("appUserId")?.Value;
+        return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<PagedResult<PointTransactionDto>>> GetAll([FromQuery] PointTransactionFilterParams filters)
+    {
+        filters.UserId = GetCurrentUserId();
+        var result = await _pointTransactionRepository.GetFilteredAsync(filters);
+
+        return Ok(new PagedResult<PointTransactionDto>
+        {
+            Data = _mapper.Map<IEnumerable<PointTransactionDto>>(result.Data),
+            PageNumber = result.PageNumber,
+            PageSize = result.PageSize,
+            TotalCount = result.TotalCount
+        });
     }
 
     [HttpGet("{id}")]
@@ -31,33 +49,24 @@ public class PointTransactionsController : ControllerBase
     {
         var transaction = await _pointTransactionRepository.GetByIdAsync(id);
 
-        if (transaction == null)
+        if (transaction == null || transaction.UserId != GetCurrentUserId())
             return NotFound($"Transaction with ID {id} was not found.");
 
         return Ok(_mapper.Map<PointTransactionDto>(transaction));
     }
 
-    [HttpGet("user/{userId}")]
-    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetByUser(Guid userId)
+    [HttpGet("type/{type}")]
+    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetByType(TransactionType type)
     {
-        var transactions = await _pointTransactionRepository.GetByUserAsync(userId);
-        return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
-    }
-
-    [HttpGet("user/{userId}/type/{type}")]
-    public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetByUserAndType(Guid userId, TransactionType type)
-    {
-        var transactions = await _pointTransactionRepository.GetByUserAndTypeAsync(userId, type);
+        var transactions = await _pointTransactionRepository.GetByUserAndTypeAsync(GetCurrentUserId(), type);
         return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
     }
 
     [HttpPost]
     public async Task<ActionResult<PointTransactionDto>> Create(CreatePointTransactionDto dto)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
         var transaction = _mapper.Map<PointTransaction>(dto);
+        transaction.UserId = GetCurrentUserId();
         var created = await _pointTransactionRepository.CreateAsync(transaction);
 
         return CreatedAtAction(nameof(GetById), new { id = created.TransactionId }, _mapper.Map<PointTransactionDto>(created));
@@ -66,11 +75,12 @@ public class PointTransactionsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var success = await _pointTransactionRepository.DeleteAsync(id);
+        var transaction = await _pointTransactionRepository.GetByIdAsync(id);
 
-        if (!success)
+        if (transaction == null || transaction.UserId != GetCurrentUserId())
             return NotFound($"Transaction with ID {id} was not found.");
 
+        await _pointTransactionRepository.DeleteAsync(id);
         return NoContent();
     }
 }

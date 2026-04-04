@@ -5,7 +5,7 @@ namespace wahaha.API.Data;
 
 public class WahahaDbContext: DbContext
 {
-    public WahahaDbContext(DbContextOptions options): base(options)
+    public WahahaDbContext(DbContextOptions<WahahaDbContext> options): base(options)
     {
             
     }

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using wahaha.API.Data;
 using wahaha.API.Models.Domain;
+using wahaha.API.Models.Filters;
+using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.Repositories;
@@ -20,6 +22,39 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
             .Where(s => s.UserId == userId && s.IsActive)
             .OrderByDescending(s => s.CurrentCount)
             .ToListAsync();
+
+    public async Task<PagedResult<Streak>> GetFilteredAsync(StreakFilterParams filters)
+    {
+        var query = _dbSet.AsQueryable();
+
+        if (filters.UserId.HasValue)
+            query = query.Where(s => s.UserId == filters.UserId.Value);
+
+        if (!string.IsNullOrEmpty(filters.StreakType))
+            query = query.Where(s => s.StreakType == filters.StreakType);
+
+        if (filters.IsActive.HasValue)
+            query = query.Where(s => s.IsActive == filters.IsActive.Value);
+
+        if (filters.MinCount.HasValue)
+            query = query.Where(s => s.CurrentCount >= filters.MinCount.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var data = await query
+            .OrderByDescending(s => s.CurrentCount)
+            .Skip((filters.PageNumber - 1) * filters.PageSize)
+            .Take(filters.PageSize)
+            .ToListAsync();
+
+        return new PagedResult<Streak>
+        {
+            Data = data,
+            PageNumber = filters.PageNumber,
+            PageSize = filters.PageSize,
+            TotalCount = totalCount
+        };
+    }
 
     public async Task<bool> IncrementAsync(int id)
     {
