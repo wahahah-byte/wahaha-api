@@ -58,7 +58,7 @@ public static class SeedData
     }
 
     // -------------------------------------------------------
-    // Users
+    // Users — emails follow username+test@wahaha.com format
     // -------------------------------------------------------
     private static readonly Guid User1Id = new("ea80e4bc-017d-4729-99d3-29ad8a5d9b47"); // DailyDragon
     private static readonly Guid User2Id = new("9e8e1aa6-273c-48c3-8634-56b630d6f3e3"); // QuestKnight
@@ -70,12 +70,12 @@ public static class SeedData
     private static void SeedUsers(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Users>().HasData(
-            new Users { UserId = User1Id, Username = "DailyDragon", Email = "dailydragon@email.com", TotalPointsEarned = 310, CurrentBalance = 310, Level = 4, Xp = 1200, CreatedAt = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc) },
-            new Users { UserId = User2Id, Username = "QuestKnight", Email = "questknight@email.com", TotalPointsEarned = 820, CurrentBalance = 200, Level = 9, Xp = 3300, CreatedAt = new DateTime(2026, 1, 22, 0, 0, 0, DateTimeKind.Utc) },
-            new Users { UserId = User3Id, Username = "ShadowFox", Email = "shadowfox@email.com", TotalPointsEarned = 0, CurrentBalance = 0, Level = 1, Xp = 0, CreatedAt = new DateTime(2026, 3, 24, 0, 0, 0, DateTimeKind.Utc) },
-            new Users { UserId = User4Id, Username = "LevelUpLila", Email = "leveluplila@email.com", TotalPointsEarned = 90, CurrentBalance = 90, Level = 2, Xp = 300, CreatedAt = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new Users { UserId = User5Id, Username = "PixelQueen", Email = "pixelqueen@email.com", TotalPointsEarned = 1240, CurrentBalance = 380, Level = 12, Xp = 4800, CreatedAt = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc) },
-            new Users { UserId = User6Id, Username = "TaskMaster9", Email = "taskmaster9@email.com", TotalPointsEarned = 560, CurrentBalance = 560, Level = 6, Xp = 2100, CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc) }
+            new Users { UserId = User1Id, Username = "DailyDragon", Email = "dailydragon+test@wahaha.com", TotalPointsEarned = 310, CurrentBalance = 310, Level = 4, Xp = 1200, CreatedAt = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc) },
+            new Users { UserId = User2Id, Username = "QuestKnight", Email = "questknight+test@wahaha.com", TotalPointsEarned = 820, CurrentBalance = 200, Level = 9, Xp = 3300, CreatedAt = new DateTime(2026, 1, 22, 0, 0, 0, DateTimeKind.Utc) },
+            new Users { UserId = User3Id, Username = "ShadowFox", Email = "shadowfox+test@wahaha.com", TotalPointsEarned = 0, CurrentBalance = 0, Level = 1, Xp = 0, CreatedAt = new DateTime(2026, 3, 24, 0, 0, 0, DateTimeKind.Utc) },
+            new Users { UserId = User4Id, Username = "LevelUpLila", Email = "leveluplila+test@wahaha.com", TotalPointsEarned = 90, CurrentBalance = 90, Level = 2, Xp = 300, CreatedAt = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new Users { UserId = User5Id, Username = "PixelQueen", Email = "pixelqueen+test@wahaha.com", TotalPointsEarned = 1240, CurrentBalance = 380, Level = 12, Xp = 4800, CreatedAt = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc) },
+            new Users { UserId = User6Id, Username = "TaskMaster9", Email = "taskmaster9+test@wahaha.com", TotalPointsEarned = 560, CurrentBalance = 560, Level = 6, Xp = 2100, CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc) }
         );
     }
 
@@ -85,37 +85,26 @@ public static class SeedData
     private static void SeedUserInventory(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserInventory>().HasData(
-            // QuestKnight — well geared, multiple slots filled
-            new UserInventory { InventoryId = 1, UserId = User2Id, ItemId = 1, AcquiredAt = new DateTime(2026, 1, 25, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Wizard Hat (HEAD)
-            new UserInventory { InventoryId = 2, UserId = User2Id, ItemId = 4, AcquiredAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), IsEquipped = false }, // Bunny Ears (HEAD)
-            new UserInventory { InventoryId = 3, UserId = User2Id, ItemId = 9, AcquiredAt = new DateTime(2026, 2, 5, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Ninja Outfit (BODY)
-            new UserInventory { InventoryId = 4, UserId = User2Id, ItemId = 15, AcquiredAt = new DateTime(2026, 2, 10, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Shield of Tasks (HAND)
-            new UserInventory { InventoryId = 5, UserId = User2Id, ItemId = 11, AcquiredAt = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Cape of Valor (BACK)
-            new UserInventory { InventoryId = 6, UserId = User2Id, ItemId = 6, AcquiredAt = new DateTime(2026, 2, 20, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Pixel Shades (FACE)
-
-            // PixelQueen — highest level, legendary items
-            new UserInventory { InventoryId = 7, UserId = User5Id, ItemId = 12, AcquiredAt = new DateTime(2026, 1, 12, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Robot Helmet (HEAD)
-            new UserInventory { InventoryId = 8, UserId = User5Id, ItemId = 2, AcquiredAt = new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Space Suit (BODY)
-            new UserInventory { InventoryId = 9, UserId = User5Id, ItemId = 10, AcquiredAt = new DateTime(2026, 1, 20, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Magic Staff (HAND)
-            new UserInventory { InventoryId = 10, UserId = User5Id, ItemId = 7, AcquiredAt = new DateTime(2026, 1, 25, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Dragon Wings (BACK)
-            new UserInventory { InventoryId = 11, UserId = User5Id, ItemId = 6, AcquiredAt = new DateTime(2026, 1, 28, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Pixel Shades (FACE)
-            new UserInventory { InventoryId = 12, UserId = User5Id, ItemId = 3, AcquiredAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), IsEquipped = false }, // Golden Sword (HAND) unequipped
-
-            // TaskMaster9 — mid level
-            new UserInventory { InventoryId = 13, UserId = User6Id, ItemId = 14, AcquiredAt = new DateTime(2026, 2, 3, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Pirate Hat (HEAD)
-            new UserInventory { InventoryId = 14, UserId = User6Id, ItemId = 5, AcquiredAt = new DateTime(2026, 2, 8, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Adventurer Cloak (BODY)
-            new UserInventory { InventoryId = 15, UserId = User6Id, ItemId = 15, AcquiredAt = new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Shield of Tasks (HAND)
-
-            // DailyDragon — mid level
-            new UserInventory { InventoryId = 16, UserId = User1Id, ItemId = 8, AcquiredAt = new DateTime(2026, 2, 16, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Flower Crown (HEAD)
-            new UserInventory { InventoryId = 17, UserId = User1Id, ItemId = 13, AcquiredAt = new DateTime(2026, 2, 18, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Casual Hoodie (BODY)
-            new UserInventory { InventoryId = 18, UserId = User1Id, ItemId = 11, AcquiredAt = new DateTime(2026, 2, 22, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Cape of Valor (BACK)
-
-            // LevelUpLila — new user, just a couple items
-            new UserInventory { InventoryId = 19, UserId = User4Id, ItemId = 4, AcquiredAt = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }, // Bunny Ears (HEAD)
-            new UserInventory { InventoryId = 20, UserId = User4Id, ItemId = 13, AcquiredAt = new DateTime(2026, 3, 3, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }  // Casual Hoodie (BODY)
-
-            // ShadowFox — newest user, no items yet
+            new UserInventory { InventoryId = 1, UserId = User2Id, ItemId = 1, AcquiredAt = new DateTime(2026, 1, 25, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 2, UserId = User2Id, ItemId = 4, AcquiredAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), IsEquipped = false },
+            new UserInventory { InventoryId = 3, UserId = User2Id, ItemId = 9, AcquiredAt = new DateTime(2026, 2, 5, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 4, UserId = User2Id, ItemId = 15, AcquiredAt = new DateTime(2026, 2, 10, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 5, UserId = User2Id, ItemId = 11, AcquiredAt = new DateTime(2026, 2, 15, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 6, UserId = User2Id, ItemId = 6, AcquiredAt = new DateTime(2026, 2, 20, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 7, UserId = User5Id, ItemId = 12, AcquiredAt = new DateTime(2026, 1, 12, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 8, UserId = User5Id, ItemId = 2, AcquiredAt = new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 9, UserId = User5Id, ItemId = 10, AcquiredAt = new DateTime(2026, 1, 20, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 10, UserId = User5Id, ItemId = 7, AcquiredAt = new DateTime(2026, 1, 25, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 11, UserId = User5Id, ItemId = 6, AcquiredAt = new DateTime(2026, 1, 28, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 12, UserId = User5Id, ItemId = 3, AcquiredAt = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), IsEquipped = false },
+            new UserInventory { InventoryId = 13, UserId = User6Id, ItemId = 14, AcquiredAt = new DateTime(2026, 2, 3, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 14, UserId = User6Id, ItemId = 5, AcquiredAt = new DateTime(2026, 2, 8, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 15, UserId = User6Id, ItemId = 15, AcquiredAt = new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 16, UserId = User1Id, ItemId = 8, AcquiredAt = new DateTime(2026, 2, 16, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 17, UserId = User1Id, ItemId = 13, AcquiredAt = new DateTime(2026, 2, 18, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 18, UserId = User1Id, ItemId = 11, AcquiredAt = new DateTime(2026, 2, 22, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 19, UserId = User4Id, ItemId = 4, AcquiredAt = new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true },
+            new UserInventory { InventoryId = 20, UserId = User4Id, ItemId = 13, AcquiredAt = new DateTime(2026, 3, 3, 0, 0, 0, DateTimeKind.Utc), IsEquipped = true }
         );
     }
 
