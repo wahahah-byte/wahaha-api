@@ -2,7 +2,7 @@ using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
-using wahaha.API.Models.DTOs;
+using wahaha.API.Models.DTO;
 using wahaha.API.Models.Filters;
 using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
@@ -16,11 +16,13 @@ public class UsersController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
     private readonly IMapper _mapper;
+    private readonly ILogger<UsersController> _logger;
 
-    public UsersController(IUserRepository userRepository, IMapper mapper)
+    public UsersController(IUserRepository userRepository, IMapper mapper, ILogger<UsersController> logger)
     {
         _userRepository = userRepository;
         _mapper = mapper;
+        _logger = logger;
     }
 
     private Guid GetCurrentUserId()
@@ -32,10 +34,16 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<UserDto>> GetCurrentUser()
     {
-        var user = await _userRepository.GetByIdWithTransactionsAsync(GetCurrentUserId());
+        var userId = GetCurrentUserId();
+        _logger.LogDebug("Fetching profile for user {UserId}", userId);
+
+        var user = await _userRepository.GetByIdWithTransactionsAsync(userId);
 
         if (user == null)
+        {
+            _logger.LogWarning("User {UserId} not found", userId);
             return NotFound("User was not found.");
+        }
 
         return Ok(_mapper.Map<UserDto>(user));
     }
@@ -44,15 +52,21 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> Update(UpdateUserDto dto)
     {
         var userId = GetCurrentUserId();
+        _logger.LogInformation("Updating profile for user {UserId}", userId);
+
         var user = await _userRepository.GetByIdAsync(userId);
 
         if (user == null)
+        {
+            _logger.LogWarning("User {UserId} not found for update", userId);
             return NotFound("User was not found.");
+        }
 
         dto.UserId = userId;
         _mapper.Map(dto, user);
         await _userRepository.UpdateAsync(user);
 
+        _logger.LogInformation("Profile updated for user {UserId}", userId);
         return NoContent();
     }
 
@@ -62,10 +76,16 @@ public class UsersController : ControllerBase
         if (points <= 0)
             return BadRequest("Points must be a positive number.");
 
-        var success = await _userRepository.AddPointsAsync(GetCurrentUserId(), points);
+        var userId = GetCurrentUserId();
+        _logger.LogInformation("Adding {Points} points to user {UserId}", points, userId);
+
+        var success = await _userRepository.AddPointsAsync(userId, points);
 
         if (!success)
+        {
+            _logger.LogWarning("User {UserId} not found when adding points", userId);
             return NotFound("User was not found.");
+        }
 
         return NoContent();
     }
@@ -76,10 +96,17 @@ public class UsersController : ControllerBase
         if (points <= 0)
             return BadRequest("Points must be a positive number.");
 
-        var success = await _userRepository.SpendPointsAsync(GetCurrentUserId(), points);
+        var userId = GetCurrentUserId();
+        _logger.LogInformation("Spending {Points} points for user {UserId}", points, userId);
+
+        var success = await _userRepository.SpendPointsAsync(userId, points);
 
         if (!success)
+        {
+            _logger.LogWarning("User {UserId} not found or insufficient balance when spending {Points} points",
+                userId, points);
             return NotFound("User was not found or has insufficient balance.");
+        }
 
         return NoContent();
     }

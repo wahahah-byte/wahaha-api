@@ -12,15 +12,22 @@ public class TokenService : ITokenService
 {
     private readonly IConfiguration _configuration;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly ILogger<TokenService> _logger;
 
-    public TokenService(IConfiguration configuration, UserManager<ApplicationUser> userManager)
+    public TokenService(
+        IConfiguration configuration,
+        UserManager<ApplicationUser> userManager,
+        ILogger<TokenService> logger)
     {
         _configuration = configuration;
         _userManager = userManager;
+        _logger = logger;
     }
 
     public async Task<string> CreateToken(ApplicationUser user, Guid appUserId, string username)
     {
+        _logger.LogDebug("Creating JWT token for user {Username} ({UserId})", username, appUserId);
+
         var roles = await _userManager.GetRolesAsync(user);
 
         var claims = new List<Claim>
@@ -31,7 +38,6 @@ public class TokenService : ITokenService
             new Claim("username", username)
         };
 
-        // Add each role as a separate claim
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
 
@@ -50,6 +56,9 @@ public class TokenService : ITokenService
             expires: expiry,
             signingCredentials: credentials
         );
+
+        _logger.LogInformation("JWT token created for user {Username} with roles [{Roles}], expires {Expiry}",
+            username, string.Join(", ", roles), expiry);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }

@@ -16,11 +16,13 @@ public class StreaksController : ControllerBase
 {
     private readonly IStreakRepository _streakRepository;
     private readonly IMapper _mapper;
+    private readonly ILogger<StreaksController> _logger;
 
-    public StreaksController(IStreakRepository streakRepository, IMapper mapper)
+    public StreaksController(IStreakRepository streakRepository, IMapper mapper, ILogger<StreaksController> logger)
     {
         _streakRepository = streakRepository;
         _mapper = mapper;
+        _logger = logger;
     }
 
     private Guid GetCurrentUserId()
@@ -32,7 +34,10 @@ public class StreaksController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<StreakDto>>> GetAll([FromQuery] StreakFilterParams filters)
     {
-        filters.UserId = GetCurrentUserId();
+        var userId = GetCurrentUserId();
+        filters.UserId = userId;
+        _logger.LogDebug("Fetching streaks for user {UserId}", userId);
+
         var result = await _streakRepository.GetFilteredAsync(filters);
 
         return Ok(new PagedResult<StreakDto>
@@ -47,10 +52,14 @@ public class StreaksController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<StreakDto>> GetById(int id)
     {
+        _logger.LogDebug("Fetching streak {StreakId}", id);
         var streak = await _streakRepository.GetByIdAsync(id);
 
         if (streak == null || streak.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Streak {StreakId} not found or unauthorized", id);
             return NotFound($"Streak with ID {id} was not found.");
+        }
 
         return Ok(_mapper.Map<StreakDto>(streak));
     }
@@ -58,27 +67,38 @@ public class StreaksController : ControllerBase
     [HttpGet("active")]
     public async Task<ActionResult<IEnumerable<StreakDto>>> GetActive()
     {
-        var streaks = await _streakRepository.GetActiveByUserAsync(GetCurrentUserId());
+        var userId = GetCurrentUserId();
+        _logger.LogDebug("Fetching active streaks for user {UserId}", userId);
+
+        var streaks = await _streakRepository.GetActiveByUserAsync(userId);
         return Ok(_mapper.Map<IEnumerable<StreakDto>>(streaks));
     }
 
     [HttpPost]
     public async Task<ActionResult<StreakDto>> Create(CreateStreakDto dto)
     {
+        var userId = GetCurrentUserId();
+        _logger.LogInformation("Creating streak {StreakType} for user {UserId}", dto.StreakType, userId);
+
         var streak = _mapper.Map<Streak>(dto);
-        streak.UserId = GetCurrentUserId();
+        streak.UserId = userId;
         var created = await _streakRepository.CreateAsync(streak);
 
+        _logger.LogInformation("Streak {StreakId} created for user {UserId}", created.StreakId, userId);
         return CreatedAtAction(nameof(GetById), new { id = created.StreakId }, _mapper.Map<StreakDto>(created));
     }
 
     [HttpPatch("{id}/increment")]
     public async Task<IActionResult> Increment(int id)
     {
+        _logger.LogInformation("Incrementing streak {StreakId}", id);
         var streak = await _streakRepository.GetByIdAsync(id);
 
         if (streak == null || streak.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Streak {StreakId} not found or unauthorized for increment", id);
             return NotFound($"Streak with ID {id} was not found.");
+        }
 
         await _streakRepository.IncrementAsync(id);
         return NoContent();
@@ -87,10 +107,14 @@ public class StreaksController : ControllerBase
     [HttpPatch("{id}/reset")]
     public async Task<IActionResult> Reset(int id)
     {
+        _logger.LogInformation("Resetting streak {StreakId}", id);
         var streak = await _streakRepository.GetByIdAsync(id);
 
         if (streak == null || streak.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Streak {StreakId} not found or unauthorized for reset", id);
             return NotFound($"Streak with ID {id} was not found.");
+        }
 
         await _streakRepository.ResetAsync(id);
         return NoContent();
@@ -99,12 +123,17 @@ public class StreaksController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
+        _logger.LogInformation("Deleting streak {StreakId}", id);
         var streak = await _streakRepository.GetByIdAsync(id);
 
         if (streak == null || streak.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Streak {StreakId} not found or unauthorized for deletion", id);
             return NotFound($"Streak with ID {id} was not found.");
+        }
 
         await _streakRepository.DeleteAsync(id);
+        _logger.LogInformation("Streak {StreakId} deleted successfully", id);
         return NoContent();
     }
 }
