@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using wahaha.API.Data;
+using wahaha.API.Middleware;
 using wahaha.API.Models.Auth;
 using wahaha.API.Repositories;
 using wahaha.API.Repositories.Interfaces;
@@ -14,6 +15,15 @@ using wahaha.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+builder.Services.AddApplicationInsightsTelemetry(options =>
+{
+    options.ConnectionString = builder.Configuration["ApplicationInsights:ConnectionString"];
+});
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -21,7 +31,31 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
+
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
+
+        document.Components.SecuritySchemes["Bearer"] = new Microsoft.OpenApi.OpenApiSecurityScheme
+        {
+            Type = Microsoft.OpenApi.SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "Enter your JWT token"
+        };
+
+        document.Security ??= new List<Microsoft.OpenApi.OpenApiSecurityRequirement>();
+        document.Security.Add(new Microsoft.OpenApi.OpenApiSecurityRequirement
+        {
+            [new Microsoft.OpenApi.OpenApiSecuritySchemeReference("Bearer", document)] = []
+        });
+
+        return Task.CompletedTask;
+    });
+});
 
 builder.Services.AddDbContext<WahahaDbContext>(options =>
     options.UseSqlServer(
@@ -87,8 +121,12 @@ builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IBlobService, BlobService>();
 
 var app = builder.Build();
+
+// Global exception handling must be first in the pipeline
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -98,10 +136,8 @@ if (app.Environment.IsDevelopment())
         options.Title = "Wahaha API";
         options.Theme = ScalarTheme.DeepSpace;
         options.DefaultHttpClient = new(ScalarTarget.Http, ScalarClient.HttpClient);
-        options.Authentication = new ScalarAuthenticationOptions
-        {
-            PreferredSecuritySchemes = new List<string> { "Bearer" }
-        };
+        options.AddPreferredSecuritySchemes("Bearer");
+        options.AddHttpAuthentication("Bearer", http => { });
     });
 }
 

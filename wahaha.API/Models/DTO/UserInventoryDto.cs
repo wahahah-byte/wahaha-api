@@ -1,4 +1,4 @@
-namespace wahaha.API.Models.DTOs;
+namespace wahaha.API.Models.DTO;
 
 public class UserInventoryDto
 {

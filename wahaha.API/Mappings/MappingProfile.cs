@@ -1,7 +1,6 @@
-﻿using AutoMapper;
+using AutoMapper;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO;
-using wahaha.API.Models.DTOs;
 
 namespace wahaha.API.Mappings;
 
@@ -16,11 +15,15 @@ public class MappingProfile : Profile
 
         CreateMap<CreateAvatarItemDto, AvatarItem>()
             .ForMember(dest => dest.Slot, opt => opt.MapFrom(src => Enum.Parse<ItemSlot>(src.Slot, true)))
-            .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)));
+            .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)))
+            .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())  // handled by BlobService
+            .ForMember(dest => dest.UserInventories, opt => opt.Ignore());
 
         CreateMap<UpdateAvatarItemDto, AvatarItem>()
             .ForMember(dest => dest.Slot, opt => opt.MapFrom(src => Enum.Parse<ItemSlot>(src.Slot, true)))
-            .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)));
+            .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)))
+            .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())  // handled by BlobService
+            .ForMember(dest => dest.UserInventories, opt => opt.Ignore());
 
         // Minigame
         CreateMap<Minigame, MinigameDto>()
@@ -84,7 +87,8 @@ public class MappingProfile : Profile
 
         // UserInventory
         CreateMap<UserInventory, UserInventoryDto>()
-    .ForMember(dest => dest.AvatarItem, opt => opt.MapFrom(src => src.AvatarItem));
+            .ForMember(dest => dest.AvatarItem, opt => opt.MapFrom(src => src.AvatarItem));
+
         CreateMap<CreateUserInventoryDto, UserInventory>()
             .ForMember(dest => dest.AcquiredAt, opt => opt.MapFrom(src => DateTime.UtcNow));
 
