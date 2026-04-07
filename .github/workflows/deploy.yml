@@ -1,5 +1,4 @@
 name: Deploy Wahaha API to Azure App Service
-
 on:
   push:
     branches:
