@@ -122,12 +122,28 @@ builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IBlobService, BlobService>();
-
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("WahahaPolicy", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
+        else
+        {
+            policy
+                .AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    });
+});
 var app = builder.Build();
 
 // Global exception handling must be first in the pipeline
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
-
+app.UseCors("WahahaPolicy");
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
