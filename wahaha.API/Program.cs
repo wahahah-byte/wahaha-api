@@ -141,7 +141,6 @@ builder.Services.AddCors(options =>
 });
 var app = builder.Build();
 
-// Global exception handling must be first in the pipeline
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 app.UseCors("WahahaPolicy");
 if (app.Environment.IsDevelopment())
