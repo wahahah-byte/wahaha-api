@@ -140,7 +140,6 @@ builder.Services.AddCors(options =>
         }
     });
 });
-builder.Services.AddApplicationInsightsTelemetry();
 builder.Services.AddOpenTelemetry().UseAzureMonitor();
 var app = builder.Build();
 
