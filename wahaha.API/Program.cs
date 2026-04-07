@@ -1,11 +1,10 @@
-using Azure.Monitor.OpenTelemetry.AspNetCore;
+using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using System.Text;
-using System.Text.Json.Serialization;
 using wahaha.API.Data;
 using wahaha.API.Middleware;
 using wahaha.API.Models.Auth;
@@ -140,7 +139,8 @@ builder.Services.AddCors(options =>
         }
     });
 });
-builder.Services.AddOpenTelemetry().UseAzureMonitor();
+builder.Services.AddApplicationInsightsTelemetry();
+
 var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
