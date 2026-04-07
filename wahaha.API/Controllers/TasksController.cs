@@ -29,7 +29,21 @@ public class TasksController : ControllerBase
         var claim = User.FindFirst("appUserId")?.Value;
         return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
     }
+    [AllowAnonymous]
+    [HttpGet("debug/config")]
+    public IActionResult DebugConfig([FromServices] IConfiguration config)
+    {
+        var sqlConn = config.GetConnectionString("WahahaByteConnectionString");
+        var blobConn = config.GetConnectionString("AzureBlobStorage");
 
+        return Ok(new
+        {
+            sqlConnLength = sqlConn?.Length ?? 0,
+            sqlConnStart = sqlConn?.Substring(0, Math.Min(20, sqlConn?.Length ?? 0)),
+            blobConnLength = blobConn?.Length ?? 0,
+            blobConnStart = blobConn?.Substring(0, Math.Min(20, blobConn?.Length ?? 0))
+        });
+    }
     [HttpGet]
     public async Task<ActionResult<PagedResult<TaskDto>>> GetAll([FromQuery] TaskFilterParams filters)
     {
