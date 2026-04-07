@@ -143,7 +143,6 @@ var app = builder.Build();
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 app.UseCors("WahahaPolicy");
-
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
