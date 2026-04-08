@@ -129,7 +129,7 @@ builder.Services.AddCors(options =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+            policy.WithOrigins("https://localhost:7281", "http://localhost:3000").AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
         }
         else
         {
