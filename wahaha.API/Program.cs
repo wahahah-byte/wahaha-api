@@ -129,8 +129,6 @@ builder.Services.AddApplicationInsightsTelemetry(options =>
     options.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
         ?? builder.Configuration["ApplicationInsights:ConnectionString"];
 });
-
-var app = builder.Build();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WahahaPolicy", policy =>
@@ -149,6 +147,8 @@ builder.Services.AddCors(options =>
     });
 });
 app.UseCors("WahahaPolicy");
+var app = builder.Build();
+
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
