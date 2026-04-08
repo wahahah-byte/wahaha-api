@@ -146,9 +146,9 @@ builder.Services.AddCors(options =>
         }
     });
 });
-app.UseCors("WahahaPolicy");
 var app = builder.Build();
 
+app.UseCors("WahahaPolicy");
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
