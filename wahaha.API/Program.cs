@@ -122,6 +122,7 @@ builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IBlobService, BlobService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("WahahaPolicy", policy =>
@@ -133,6 +134,7 @@ builder.Services.AddCors(options =>
         else
         {
             policy
+             .WithOrigins("http://localhost:3000")
                 .AllowAnyOrigin()
                 .AllowAnyHeader()
                 .AllowAnyMethod();
