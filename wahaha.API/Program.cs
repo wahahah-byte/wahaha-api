@@ -123,24 +123,7 @@ builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IBlobService, BlobService>();
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("WahahaPolicy", policy =>
-    {
-        if (builder.Environment.IsDevelopment())
-        {
-            policy.WithOrigins("https://localhost:7281", "http://localhost:3000").AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-        }
-        else
-        {
-            policy
-             .WithOrigins("http://localhost:3000")
-                .AllowAnyOrigin()
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        }
-    });
-});
+
 builder.Services.AddApplicationInsightsTelemetry(options =>
 {
     options.ConnectionString = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
@@ -148,9 +131,27 @@ builder.Services.AddApplicationInsightsTelemetry(options =>
 });
 
 var app = builder.Build();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("WahahaPolicy", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.WithOrigins("http://localhost:3000").AllowAnyHeader().AllowAnyMethod();
+        }
+        else
+        {
+            policy
+             .WithOrigins("http://localhost:3000")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    });
+});
+app.UseCors("WahahaPolicy");
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
-app.UseCors("WahahaPolicy");
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
