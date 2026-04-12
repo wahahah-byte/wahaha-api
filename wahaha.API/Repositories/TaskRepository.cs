@@ -65,10 +65,35 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         };
     }
 
+    public async Task<bool> StartAsync(Guid id)
+    {
+        _logger.LogInformation("Starting task {TaskId}", id);
+        var task = await _dbSet.FindAsync(id);
+
+        if (task == null)
+        {
+            _logger.LogWarning("Task {TaskId} not found for start", id);
+            return false;
+        }
+
+        if (task.Status != ByteTaskStatus.pending)
+        {
+            _logger.LogWarning("Task {TaskId} cannot be started — current status is {Status}", id, task.Status);
+            return false;
+        }
+
+        task.Status = ByteTaskStatus.in_progress;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Task {TaskId} started successfully", id);
+        return true;
+    }
+
     public async Task<bool> CompleteAsync(Guid id)
     {
         _logger.LogInformation("Completing task {TaskId}", id);
         var task = await _dbSet.FindAsync(id);
+
         if (task == null)
         {
             _logger.LogWarning("Task {TaskId} not found for completion", id);

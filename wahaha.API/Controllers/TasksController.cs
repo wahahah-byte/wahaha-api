@@ -1,7 +1,8 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using wahaha.API.Models.DTO;
+using wahaha.API.Models.Domain;
+using wahaha.API.Models.DTO           ;
 using wahaha.API.Models.Filters;
 using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
@@ -81,6 +82,7 @@ public class TasksController : ControllerBase
 
         var task = _mapper.Map<Models.Domain.Task>(dto);
         task.UserId = userId;
+        task.Status = ByteTaskStatus.pending; // always starts as pending
         var created = await _taskRepository.CreateAsync(task);
 
         _logger.LogInformation("Task {TaskId} created for user {UserId}", created.TaskId, userId);
@@ -109,6 +111,30 @@ public class TasksController : ControllerBase
         return NoContent();
     }
 
+    [HttpPatch("{id}/start")]
+    public async Task<IActionResult> Start(Guid id)
+    {
+        _logger.LogInformation("Starting task {TaskId}", id);
+        var task = await _taskRepository.GetByIdAsync(id);
+
+        if (task == null || task.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Task {TaskId} not found or unauthorized for start", id);
+            return NotFound($"Task with ID {id} was not found.");
+        }
+
+        if (task.Status != ByteTaskStatus.pending)
+            return BadRequest($"Task cannot be started — current status is {task.Status}. Only pending tasks can be started.");
+
+        var success = await _taskRepository.StartAsync(id);
+
+        if (!success)
+            return BadRequest("Task could not be started.");
+
+        _logger.LogInformation("Task {TaskId} started successfully", id);
+        return NoContent();
+    }
+
     [HttpPatch("{id}/complete")]
     public async Task<IActionResult> Complete(Guid id)
     {
@@ -121,10 +147,13 @@ public class TasksController : ControllerBase
             return NotFound($"Task with ID {id} was not found.");
         }
 
+        if (task.Status == ByteTaskStatus.completed)
+            return BadRequest("Task is already completed.");
+
         var success = await _taskRepository.CompleteAsync(id);
 
         if (!success)
-            return BadRequest("Task is already completed.");
+            return BadRequest("Task could not be completed.");
 
         _logger.LogInformation("Task {TaskId} completed successfully", id);
         return NoContent();
