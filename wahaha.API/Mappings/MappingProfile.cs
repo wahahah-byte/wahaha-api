@@ -93,7 +93,11 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.AcquiredAt, opt => opt.MapFrom(src => DateTime.UtcNow));
 
         // Users
-        CreateMap<Users, UserDto>();
+        CreateMap<Users, UserDto>()
+            .ForMember(dest => dest.PointsSubmittedToday, opt => opt.MapFrom(src =>
+                src.PointTransactions
+                    .Where(pt => pt.Type == TransactionType.EARN && pt.CreatedAt.Date == DateTime.UtcNow.Date)
+                    .Sum(pt => pt.Amount)));
         CreateMap<CreateUserDto, Users>()
             .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => Guid.NewGuid()))
             .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
