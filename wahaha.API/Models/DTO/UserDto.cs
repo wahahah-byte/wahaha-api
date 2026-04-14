@@ -10,6 +10,7 @@ public class UserDto
     public int Level { get; set; }
     public int Xp { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int PointsSubmittedToday { get; set; }
     public List<PointTransactionDto> PointTransactions { get; set; } = new();
 }
 

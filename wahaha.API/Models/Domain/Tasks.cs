@@ -52,7 +52,8 @@ public class Task
     [Required]
     [Column("is_recurring")]
     public bool IsRecurring { get; set; } = false;
-
+    [Column("submitted")]
+    public bool? Submitted { get; set; } = false;
     [MaxLength(50)]
     [Column("recurrence_rule")]
     public string? RecurrenceRule { get; set; }

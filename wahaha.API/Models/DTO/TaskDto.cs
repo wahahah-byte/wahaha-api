@@ -15,6 +15,7 @@ public class TaskDto
     public DateTime? CompletedAt { get; set; }
     public bool IsRecurring { get; set; }
     public string? RecurrenceRule { get; set; }
+    public bool Submitted { get; set; } = false;
 }
 
 public class CreateTaskDto
@@ -29,6 +30,8 @@ public class CreateTaskDto
     public DateTime? DueDate { get; set; }
     public bool IsRecurring { get; set; } = false;
     public string? RecurrenceRule { get; set; }
+    public bool Submitted { get; set; } = false;
+
 }
 
 public class UpdateTaskDto
@@ -44,4 +47,5 @@ public class UpdateTaskDto
     public DateTime? CompletedAt { get; set; }
     public bool IsRecurring { get; set; }
     public string? RecurrenceRule { get; set; }
+    public bool? Submitted { get; set; }
 }

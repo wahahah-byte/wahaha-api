@@ -31,7 +31,7 @@ public class UsersController : ControllerBase
         return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
     }
 
-    [HttpGet]
+    [HttpGet("me")]
     public async Task<ActionResult<UserDto>> GetCurrentUser()
     {
         var userId = GetCurrentUserId();
