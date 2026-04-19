@@ -10,4 +10,5 @@ public interface IPointTransactionRepository : IRepository<PointTransaction, int
     Task<IEnumerable<PointTransaction>> GetByUserAndTypeAsync(Guid userId, TransactionType type);
     Task<PagedResult<PointTransaction>> GetFilteredAsync(PointTransactionFilterParams filters);
     Task<int> GetDailyEarnedAsync(Guid userId, DateTime utcDate);
+    Task<int> GetDailyEarnedBySourceTypeAsync(Guid userId, DateTime utcDate, SourceType sourceType);
 }

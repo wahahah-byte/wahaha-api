@@ -11,6 +11,7 @@ public class UserDto
     public int Xp { get; set; }
     public DateTime CreatedAt { get; set; }
     public int PointsSubmittedToday { get; set; }
+    public int RecurringPointsSubmittedToday { get; set; }
     public List<PointTransactionDto> PointTransactions { get; set; } = new();
 }
 

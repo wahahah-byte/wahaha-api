@@ -1,13 +1,14 @@
-using System.Text;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using System.Text;
+using System.Text.Json.Serialization;
 using wahaha.API.Data;
 using wahaha.API.Middleware;
 using wahaha.API.Models.Auth;
+using wahaha.API.Models.DTO.PointsConfig;
 using wahaha.API.Repositories;
 using wahaha.API.Repositories.Interfaces;
 using wahaha.API.Services;
@@ -110,7 +111,8 @@ builder.Services.AddAutoMapper(cfg =>
 {
     cfg.AddMaps(typeof(Program).Assembly);
 });
-
+builder.Services.Configure<PointsOptions>(
+    builder.Configuration.GetSection("Points"));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAvatarItemRepository, AvatarItemRepository>();
 builder.Services.AddScoped<IMinigameRepository, MinigameRepository>();

@@ -34,9 +34,21 @@ public class PointTransactionRepository : Repository<PointTransaction, int>, IPo
     {
         var dayStart = utcDate.Date;
         var dayEnd = dayStart.AddDays(1);
+        var set = _dbSet.Where(pt => pt.UserId == userId
+                      && pt.Type == TransactionType.EARN
+                      && pt.CreatedAt >= dayStart
+                      && pt.CreatedAt < dayEnd);
+        return set.Sum(pt => pt.Amount);
+    }
+
+    public async Task<int> GetDailyEarnedBySourceTypeAsync(Guid userId, DateTime utcDate, SourceType sourceType)
+    {
+        var dayStart = utcDate.Date;
+        var dayEnd = dayStart.AddDays(1);
         return await _dbSet
             .Where(pt => pt.UserId == userId
                       && pt.Type == TransactionType.EARN
+                      && pt.SourceType == sourceType
                       && pt.CreatedAt >= dayStart
                       && pt.CreatedAt < dayEnd)
             .SumAsync(pt => pt.Amount);
