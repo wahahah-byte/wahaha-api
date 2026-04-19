@@ -97,6 +97,12 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.PointsSubmittedToday, opt => opt.MapFrom(src =>
                 src.PointTransactions
                     .Where(pt => pt.Type == TransactionType.EARN && pt.CreatedAt.Date == DateTime.UtcNow.Date)
+                    .Sum(pt => pt.Amount)))
+            .ForMember(dest => dest.RecurringPointsSubmittedToday, opt => opt.MapFrom(src =>
+                src.PointTransactions
+                    .Where(pt => pt.Type == TransactionType.EARN
+                              && pt.SourceType == SourceType.recurring_task
+                              && pt.CreatedAt.Date == DateTime.UtcNow.Date)
                     .Sum(pt => pt.Amount)));
         CreateMap<CreateUserDto, Users>()
             .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => Guid.NewGuid()))

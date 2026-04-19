@@ -49,6 +49,7 @@ public enum TransactionType
 public enum SourceType
 {
     task,
+    recurring_task,
     minigame,
     shop_item,
     streak,

@@ -34,7 +34,8 @@ public class PointsController : ControllerBase
         return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
     }
 
-    private const int DailyPointCap = 200;
+    private const int RegularDailyPointCap = 150;
+    private const int RecurringDailyPointCap = 50;
 
     [HttpPost("submit")]
     public async Task<ActionResult<SubmitPointsResponse>> Submit([FromBody] SubmitPointsRequest request)
@@ -45,31 +46,22 @@ public class PointsController : ControllerBase
         if (request.TaskIds == null || request.TaskIds.Count == 0)
             return BadRequest("No task IDs provided.");
 
-        // Check how many points the user has already earned today
-        var alreadyEarnedToday = await _pointTransactionRepository.GetDailyEarnedAsync(userId, DateTime.UtcNow);
-        var remainingCap = DailyPointCap - alreadyEarnedToday;
+        var alreadyEarnedRegularToday = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.task);
+        var alreadyEarnedRecurringToday = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
 
-        if (remainingCap <= 0)
-        {
-            _logger.LogInformation("User {UserId} has reached the daily point cap", userId);
-            return BadRequest($"Daily point limit of {DailyPointCap} already reached.");
-        }
+        var remainingRegularCap = RegularDailyPointCap - alreadyEarnedRegularToday;
+        var remainingRecurringCap = RecurringDailyPointCap - alreadyEarnedRecurringToday;
 
-        var totalPoints = 0;
+        var regularPointsAwarded = 0;
+        var recurringPointsAwarded = 0;
         var transactions = new List<PointTransactionDto>();
         var errors = new List<string>();
 
-        // Fetch existing transactions once for duplicate checks
+        // Fetch existing transactions once for duplicate checks on regular tasks
         var existingTransactions = await _pointTransactionRepository.GetByUserAsync(userId);
 
         foreach (var taskIdStr in request.TaskIds)
         {
-            if (remainingCap - totalPoints <= 0)
-            {
-                errors.Add($"Daily limit reached — remaining tasks were not awarded points.");
-                break;
-            }
-
             if (!Guid.TryParse(taskIdStr, out var taskId))
             {
                 errors.Add($"Invalid task ID format: {taskIdStr}");
@@ -92,32 +84,60 @@ public class PointsController : ControllerBase
                 continue;
             }
 
-            var alreadySubmitted = existingTransactions.Any(t =>
-                t.SourceType == SourceType.task &&
-                t.SourceId == task.TaskId.GetHashCode());
+            int pointsToAward;
+            SourceType sourceType;
 
-            if (alreadySubmitted)
+            if (task.IsRecurring)
             {
-                _logger.LogWarning("Points already submitted for task {TaskId}", taskId);
-                errors.Add($"Points for task '{task.Title}' have already been submitted.");
-                continue;
+                var remainingForTask = remainingRecurringCap - recurringPointsAwarded;
+                if (remainingForTask <= 0)
+                {
+                    errors.Add($"Recurring daily limit of {RecurringDailyPointCap} reached — '{task.Title}' was not awarded points.");
+                    continue;
+                }
+                pointsToAward = Math.Min(task.PointValue, remainingForTask);
+                sourceType = SourceType.recurring_task;
             }
+            else
+            {
+                var alreadySubmitted = existingTransactions.Any(t =>
+                    t.SourceType == SourceType.task &&
+                    t.SourceId == task.TaskId.GetHashCode());
 
-            // Cap the points awarded for this task if it would exceed the daily limit
-            var pointsToAward = Math.Min(task.PointValue, remainingCap - totalPoints);
+                if (alreadySubmitted)
+                {
+                    _logger.LogWarning("Points already submitted for task {TaskId}", taskId);
+                    errors.Add($"Points for task '{task.Title}' have already been submitted.");
+                    continue;
+                }
+
+                var remainingForTask = remainingRegularCap - regularPointsAwarded;
+                if (remainingForTask <= 0)
+                {
+                    errors.Add($"Regular daily limit of {RegularDailyPointCap} reached — remaining tasks were not awarded points.");
+                    break;
+                }
+                pointsToAward = Math.Min(task.PointValue, remainingForTask);
+                sourceType = SourceType.task;
+            }
 
             var transaction = new PointTransaction
             {
                 UserId = userId,
                 Amount = pointsToAward,
                 Type = TransactionType.EARN,
-                SourceType = SourceType.task,
+                SourceType = sourceType,
                 Description = $"Points earned for completing: {task.Title}",
                 CreatedAt = DateTime.UtcNow
             };
 
             var created = await _pointTransactionRepository.CreateAsync(transaction);
-            totalPoints += pointsToAward;
+
+            if (task.IsRecurring)
+                recurringPointsAwarded += pointsToAward;
+            else
+                regularPointsAwarded += pointsToAward;
+
             task.Submitted = true;
             await _taskRepository.UpdateAsync(task);
             transactions.Add(new PointTransactionDto
@@ -131,24 +151,29 @@ public class PointsController : ControllerBase
                 CreatedAt = created.CreatedAt
             });
 
-            _logger.LogInformation("Created transaction for task {TaskId} — {Points} points", taskId, pointsToAward);
+            _logger.LogInformation("Created transaction for task {TaskId} ({Type}) — {Points} points", taskId, sourceType, pointsToAward);
         }
 
-        // Update user balance
+        var totalPoints = regularPointsAwarded + recurringPointsAwarded;
+
         if (totalPoints > 0)
             await _userRepository.AddPointsAsync(userId, totalPoints);
 
-        var newDailyTotal = alreadyEarnedToday + totalPoints;
+        var newRegularTotal = alreadyEarnedRegularToday + regularPointsAwarded;
+        var newRecurringTotal = alreadyEarnedRecurringToday + recurringPointsAwarded;
         var user = await _userRepository.GetByIdAsync(userId);
 
-        _logger.LogInformation("User {UserId} earned {TotalPoints} points from {Count} tasks (daily total: {DailyTotal}/{Cap})",
-            userId, totalPoints, transactions.Count, newDailyTotal, DailyPointCap);
+        _logger.LogInformation(
+            "User {UserId} earned {Total} pts ({Regular} regular, {Recurring} recurring). Totals: {RegTotal}/{RegCap} regular, {RecTotal}/{RecCap} recurring",
+            userId, totalPoints, regularPointsAwarded, recurringPointsAwarded,
+            newRegularTotal, RegularDailyPointCap, newRecurringTotal, RecurringDailyPointCap);
 
         return Ok(new SubmitPointsResponse
         {
             PointsAwarded = totalPoints,
             NewBalance = user?.CurrentBalance ?? 0,
-            DailyTotal = newDailyTotal,
+            DailyTotal = newRegularTotal + newRecurringTotal,
+            RecurringDailyTotal = newRecurringTotal,
             Transactions = transactions,
             Errors = errors
         });

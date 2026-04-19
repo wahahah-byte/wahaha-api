@@ -95,6 +95,9 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
         return true;
     }
 
+    public async Task<Streak?> GetByUserAndTypeAsync(Guid userId, string streakType)
+        => await _dbSet.FirstOrDefaultAsync(s => s.UserId == userId && s.StreakType == streakType);
+
     public async Task<bool> ResetAsync(int id)
     {
         _logger.LogInformation("Resetting streak {StreakId}", id);
