@@ -16,6 +16,8 @@ public class TaskDto
     public bool IsRecurring { get; set; }
     public string? RecurrenceRule { get; set; }
     public bool Submitted { get; set; } = false;
+    public int? CurrentStreakCount { get; set; }
+    public int? LongestStreakCount { get; set; }
 }
 
 public class CreateTaskDto
