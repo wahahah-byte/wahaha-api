@@ -66,7 +66,7 @@ public class MappingProfile : Profile
 
         // Streak
         CreateMap<Streak, StreakDto>();
-
+        CreateMap<UpdateStreakDto, Streak>();
         CreateMap<CreateStreakDto, Streak>()
             .ForMember(dest => dest.LastActivityDate, opt => opt.MapFrom(src => DateTime.UtcNow));
 

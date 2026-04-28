@@ -54,10 +54,22 @@ public class TasksController : ControllerBase
         _logger.LogDebug("Fetching tasks for user {UserId}", userId);
 
         var result = await _taskRepository.GetFilteredAsync(filters);
+        var taskList = result.Data.ToList();
+        var dtos = _mapper.Map<List<TaskDto>>(taskList);
+
+        for (var i = 0; i < taskList.Count; i++)
+        {
+            var streak = taskList[i].Streaks.FirstOrDefault();
+            if (streak != null)
+            {
+                dtos[i].CurrentStreakCount = streak.CurrentCount;
+                dtos[i].LongestStreakCount = streak.LongestCount;
+            }
+        }
 
         return Ok(new PagedResult<TaskDto>
         {
-            Data = _mapper.Map<IEnumerable<TaskDto>>(result.Data),
+            Data = dtos,
             PageNumber = result.PageNumber,
             PageSize = result.PageSize,
             TotalCount = result.TotalCount
@@ -218,9 +230,10 @@ public class TasksController : ControllerBase
 
         var newRecurringTotal = alreadyEarned + pointsToAward;
 
-        // Find or create streak
-        var streakType = id.ToString();
-        var streak = await _streakRepository.GetByUserAndTypeAsync(userId, streakType);
+        // Find or create streak — look up by TaskId FK, fall back to old GUID-as-StreakType for existing records
+        var streakType = $"{task.RecurrenceRule}_{task.Category}";
+        var streak = await _streakRepository.GetByTaskIdAsync(id)
+                     ?? await _streakRepository.GetByUserAndTypeAsync(userId, id.ToString());
         var streakReset = false;
 
         if (streak == null)
@@ -228,6 +241,7 @@ public class TasksController : ControllerBase
             streak = await _streakRepository.CreateAsync(new Streak
             {
                 UserId = userId,
+                TaskId = id,
                 StreakType = streakType,
                 CurrentCount = 0,
                 LongestCount = 0,
@@ -238,6 +252,14 @@ public class TasksController : ControllerBase
         }
         else
         {
+            // Migrate legacy streak records that lack TaskId or have wrong StreakType
+            if (streak.TaskId != id || streak.StreakType != streakType)
+            {
+                streak.TaskId = id;
+                streak.StreakType = streakType;
+                await _streakRepository.UpdateAsync(streak);
+            }
+
             // Reset if missed a cycle
             var maxGapDays = task.RecurrenceRule switch
             {
@@ -282,6 +304,35 @@ public class TasksController : ControllerBase
             NextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty
         });
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        _logger.LogInformation("Deleting task {TaskId}", id);
+        var userId = GetCurrentUserId();
+
+        var task = await _taskRepository.GetByIdAsync(id);
+        var streak = await _streakRepository.GetByTaskIdAsync(id);
+
+        if (task == null || task.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Task {TaskId} not found or unauthorized for deletion", id);
+            return NotFound($"Task with ID {id} was not found.");
+        }
+
+        if (task.IsRecurring)
+        {
+            if (streak == null || streak.UserId != GetCurrentUserId())
+            {
+                _logger.LogWarning("Streak for Task: {TaskId} not found or unauthorized for deletion", task.TaskId);
+                return NotFound($"Streak was not found.");
+            }
+            await _streakRepository.DeleteAsync(streak!.StreakId);
+        }
+
+        _logger.LogInformation("Task {TaskId} deleted successfully", id);
+        return NoContent();
+    }
     public async Task<int> CheckPointLimit(Guid userId, int pointsToAdd)
     {
         var today = DateTime.UtcNow.Date;
@@ -296,33 +347,16 @@ public class TasksController : ControllerBase
         base_ = new DateTime(base_.Year, base_.Month, base_.Day, 12, 0, 0, DateTimeKind.Utc);
         switch (rule)
         {
-            case "daily":    base_ = base_.AddDays(1); break;
+            case "daily": base_ = base_.AddDays(1); break;
             case "weekdays":
                 base_ = base_.AddDays(1);
                 while (base_.DayOfWeek == DayOfWeek.Saturday || base_.DayOfWeek == DayOfWeek.Sunday)
                     base_ = base_.AddDays(1);
                 break;
-            case "weekly":   base_ = base_.AddDays(7);  break;
+            case "weekly": base_ = base_.AddDays(7); break;
             case "biweekly": base_ = base_.AddDays(14); break;
-            case "monthly":  base_ = base_.AddMonths(1); break;
+            case "monthly": base_ = base_.AddMonths(1); break;
         }
         return base_;
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        _logger.LogInformation("Deleting task {TaskId}", id);
-        var task = await _taskRepository.GetByIdAsync(id);
-
-        if (task == null || task.UserId != GetCurrentUserId())
-        {
-            _logger.LogWarning("Task {TaskId} not found or unauthorized for deletion", id);
-            return NotFound($"Task with ID {id} was not found.");
-        }
-
-        await _taskRepository.DeleteAsync(id);
-        _logger.LogInformation("Task {TaskId} deleted successfully", id);
-        return NoContent();
     }
 }
