@@ -72,8 +72,9 @@ public class MappingProfile : Profile
 
         // Task
         CreateMap<Models.Domain.Task, TaskDto>()
-            .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => src.Priority.ToString()))
-            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+          .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => src.Priority.ToString()))
+          .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
+          .ForMember(dest => dest.Submitted, opt => opt.MapFrom(src => src.Submitted));
 
         CreateMap<CreateTaskDto, Models.Domain.Task>()
             .ForMember(dest => dest.TaskId, opt => opt.MapFrom(src => Guid.NewGuid()))

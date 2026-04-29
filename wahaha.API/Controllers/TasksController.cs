@@ -1,7 +1,6 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO           ;
 using wahaha.API.Models.Filters;
@@ -97,11 +96,31 @@ public class TasksController : ControllerBase
 
         var task = _mapper.Map<Models.Domain.Task>(dto);
         task.UserId = userId;
-        task.Status = ByteTaskStatus.pending; // always starts as pending
+        task.Status = ByteTaskStatus.pending;
         var created = await _taskRepository.CreateAsync(task);
 
+        var responseDto = _mapper.Map<TaskDto>(created);
+
+        if (created.IsRecurring)
+        {
+            var streakType = $"{created.RecurrenceRule}_{created.Category}";
+            await _streakRepository.CreateAsync(new Streak
+            {
+                UserId = userId,
+                TaskId = created.TaskId,
+                StreakType = streakType,
+                CurrentCount = 0,
+                LongestCount = 0,
+                BonusMultiplier = 1.0m,
+                IsActive = true,
+                LastActivityDate = DateTime.UtcNow
+            });
+            responseDto.CurrentStreakCount = 0;
+            responseDto.LongestStreakCount = 0;
+        }
+
         _logger.LogInformation("Task {TaskId} created for user {UserId}", created.TaskId, userId);
-        return CreatedAtAction(nameof(GetById), new { id = created.TaskId }, _mapper.Map<TaskDto>(created));
+        return CreatedAtAction(nameof(GetById), new { id = created.TaskId }, responseDto);
     }
 
     [HttpPut("{id}")]
@@ -181,7 +200,6 @@ public class TasksController : ControllerBase
         _logger.LogInformation("User {UserId} checking in recurring task {TaskId}", userId, id);
 
         var task = await _taskRepository.GetByIdAsync(id);
-        var limit = await CheckPointLimit(userId, 5);
 
         if (task == null || task.UserId != userId)
             return NotFound($"Task with ID {id} was not found.");
@@ -191,13 +209,14 @@ public class TasksController : ControllerBase
 
         if (task.Status != ByteTaskStatus.pending)
             return BadRequest($"Task must be pending to check in — current status is {task.Status}.");
-        if (await CheckPointLimit(userId, 0) >= 50)
-        {
-            return BadRequest("Daily check-in limit reached.");
-        }
 
         // Award points up to recurring cap
         var alreadyEarned = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
+
+        if (alreadyEarned >= RecurringDailyPointCap)
+        {
+            return BadRequest("Daily check-in limit reached.");
+        }
         var remaining = RecurringDailyPointCap - alreadyEarned;
         var pointsToAward = Math.Max(0, Math.Min(task.PointValue, remaining));
 
@@ -281,6 +300,35 @@ public class TasksController : ControllerBase
             StreakReset = streakReset,
             NextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty
         });
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        _logger.LogInformation("Deleting task {TaskId}", id);
+        var userId = GetCurrentUserId();
+
+        var task = await _taskRepository.GetByIdAsync(id);
+        var streak = await _streakRepository.GetByTaskIdAsync(id);
+
+        if (task == null || task.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Task {TaskId} not found or unauthorized for deletion", id);
+            return NotFound($"Task with ID {id} was not found.");
+        }
+
+        if (task.IsRecurring)
+        {
+            if (streak == null || streak.UserId != GetCurrentUserId())
+            {
+                _logger.LogWarning("Streak for Task: {TaskId} not found or unauthorized for deletion", task.TaskId);
+                return NotFound($"Streak was not found.");
+            }
+            await _streakRepository.DeleteAsync(streak!.StreakId);
+        }
+        await _taskRepository.DeleteAsync(id);
+        _logger.LogInformation("Task {TaskId} deleted successfully", id);
+        return NoContent();
     }
     public async Task<int> CheckPointLimit(Guid userId, int pointsToAdd)
     {
