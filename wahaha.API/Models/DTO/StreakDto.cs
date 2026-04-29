@@ -10,6 +10,7 @@ public class StreakDto
     public DateTime LastActivityDate { get; set; }
     public decimal BonusMultiplier { get; set; }
     public bool IsActive { get; set; }
+    public Guid? TaskId { get; set; }
 }
 
 public class CreateStreakDto
@@ -20,4 +21,5 @@ public class CreateStreakDto
     public int LongestCount { get; set; } = 0;
     public decimal BonusMultiplier { get; set; } = 1.0m;
     public bool IsActive { get; set; } = true;
+    public Guid? TaskId { get; set; }
 }

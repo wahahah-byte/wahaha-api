@@ -44,4 +44,11 @@ public class Streak
     // Navigation property
     [ForeignKey("UserId")]
     public Users? User { get; set; }
+
+    [Column("task_id")]
+    public Guid? TaskId { get; set; }
+
+    // Navigation property
+    [ForeignKey("TaskId")]
+    public Task? Task { get; set; }
 }

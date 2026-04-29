@@ -58,9 +58,10 @@ public class Task
     [Column("recurrence_rule")]
     public string? RecurrenceRule { get; set; }
 
-    // Navigation property
+    // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }
+    public ICollection<Streak> Streaks { get; set; } = new List<Streak>();
 }
 public enum Priority
 {

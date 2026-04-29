@@ -34,7 +34,16 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         _logger.LogDebug("Fetching tasks with filters: UserId={UserId}, Status={Status}, Priority={Priority}, Category={Category}",
             filters.UserId, filters.Status, filters.Priority, filters.Category);
 
-        var query = _dbSet.AsQueryable();
+        IQueryable<Models.Domain.Task> query;
+        if (filters.UserId.HasValue)
+        {
+            var uid = filters.UserId.Value;
+            query = _dbSet.Include(t => t.Streaks.Where(s => s.UserId == uid && s.IsActive));
+        }
+        else
+        {
+            query = _dbSet.AsQueryable();
+        }
 
         if (filters.UserId.HasValue)
             query = query.Where(t => t.UserId == filters.UserId.Value);

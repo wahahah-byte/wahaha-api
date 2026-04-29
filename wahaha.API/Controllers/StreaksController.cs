@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO;
+using wahaha.API.Models.DTOs;
 using wahaha.API.Models.Filters;
 using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
@@ -86,6 +87,28 @@ public class StreaksController : ControllerBase
 
         _logger.LogInformation("Streak {StreakId} created for user {UserId}", created.StreakId, userId);
         return CreatedAtAction(nameof(GetById), new { id = created.StreakId }, _mapper.Map<StreakDto>(created));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, UpdateStreakDto dto)
+    {
+        if (id != dto.StreakId)
+            return BadRequest("Streak ID in the URL does not match the request body.");
+
+        _logger.LogInformation("Updating streak {StreakId}", id);
+        var streak = await _streakRepository.GetByIdAsync(id);
+
+        if (streak == null || streak.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Streak {StreakId} not found or unauthorized for update", id);
+            return NotFound($"Streak with ID {id} was not found.");
+        }
+
+        _mapper.Map(dto, streak);
+        await _streakRepository.UpdateAsync(streak);
+
+        _logger.LogInformation("Streak {StreakId} updated successfully", id);
+        return NoContent();
     }
 
     [HttpPatch("{id}/increment")]
