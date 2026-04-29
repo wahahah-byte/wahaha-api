@@ -12,6 +12,7 @@ using wahaha.API.Models.DTO.PointsConfig;
 using wahaha.API.Repositories;
 using wahaha.API.Repositories.Interfaces;
 using wahaha.API.Services;
+using wahaha.API.Converters;
 using wahaha.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
     });
 
 builder.Services.AddEndpointsApiExplorer();

@@ -45,6 +45,13 @@ public class TasksController : ControllerBase
         return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
     }
 
+    private DateTime GetClientToday()
+    {
+        if (int.TryParse(Request.Headers["X-Timezone-Offset"], out var offsetMinutes))
+            return DateTime.UtcNow.AddMinutes(-offsetMinutes).Date;
+        return DateTime.UtcNow.Date;
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<TaskDto>>> GetAll([FromQuery] TaskFilterParams filters)
     {
@@ -106,6 +113,10 @@ public class TasksController : ControllerBase
         var userId = GetCurrentUserId();
         _logger.LogInformation("Creating task for user {UserId}", userId);
 
+        var clientToday = GetClientToday();
+        if (dto.DueDate.HasValue && dto.DueDate.Value.Date < clientToday)
+            return BadRequest("Due date cannot be in the past.");
+
         var task = _mapper.Map<Models.Domain.Task>(dto);
         task.UserId = userId;
         task.Status = ByteTaskStatus.pending;
@@ -149,6 +160,12 @@ public class TasksController : ControllerBase
             _logger.LogWarning("Task {TaskId} not found or unauthorized for update", id);
             return NotFound($"Task with ID {id} was not found.");
         }
+
+        var clientToday = GetClientToday();
+        if (dto.DueDate.HasValue &&
+            dto.DueDate.Value.Date < clientToday &&
+            dto.DueDate.Value.Date != task.DueDate?.Date)
+            return BadRequest("Due date cannot be set to a past date.");
 
         _mapper.Map(dto, task);
         await _taskRepository.UpdateAsync(task);
@@ -324,6 +341,33 @@ public class TasksController : ControllerBase
         });
     }
 
+    [HttpPost("{id}/skip-cycle")]
+    public async Task<ActionResult> SkipCycle(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        _logger.LogInformation("User {UserId} skipping missed cycle for task {TaskId}", userId, id);
+
+        var task = await _taskRepository.GetByIdAsync(id);
+        if (task == null || task.UserId != userId)
+            return NotFound($"Task with ID {id} was not found.");
+
+        if (!task.IsRecurring || task.RecurrenceRule == null)
+            return BadRequest("Only recurring tasks can skip cycles.");
+
+        var streak = await _streakRepository.GetByTaskIdAsync(id)
+                     ?? await _streakRepository.GetByUserAndTypeAsync(userId, id.ToString());
+        if (streak != null)
+            await _streakRepository.ResetAsync(streak.StreakId);
+
+        var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule);
+        task.DueDate = nextDue;
+        task.Submitted = false;
+        await _taskRepository.UpdateAsync(task);
+
+        _logger.LogInformation("Cycle skipped for task {TaskId}, next due: {NextDue}", id, nextDue);
+        return Ok(new { nextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty, streakReset = true, streakCount = 0 });
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {
@@ -348,7 +392,7 @@ public class TasksController : ControllerBase
             }
             await _streakRepository.DeleteAsync(streak!.StreakId);
         }
-
+        await _taskRepository.DeleteAsync(id);
         _logger.LogInformation("Task {TaskId} deleted successfully", id);
         return NoContent();
     }

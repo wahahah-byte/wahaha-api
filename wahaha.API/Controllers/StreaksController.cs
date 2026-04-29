@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO;
-using wahaha.API.Models.DTOs;
 using wahaha.API.Models.Filters;
 using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
