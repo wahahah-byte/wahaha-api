@@ -272,10 +272,9 @@ public class TasksController : ControllerBase
 
         var newRecurringTotal = alreadyEarned + pointsToAward;
 
-        // Find or create streak — look up by TaskId FK, fall back to old GUID-as-StreakType for existing records
+        // Find or create streak by TaskId FK
         var streakType = $"{task.RecurrenceRule}_{task.Category}";
-        var streak = await _streakRepository.GetByTaskIdAsync(id)
-                     ?? await _streakRepository.GetByUserAndTypeAsync(userId, id.ToString());
+        var streak = await _streakRepository.GetByTaskIdAsync(id);
         var streakReset = false;
 
         if (streak == null)
@@ -294,14 +293,6 @@ public class TasksController : ControllerBase
         }
         else
         {
-            // Migrate legacy streak records that lack TaskId or have wrong StreakType
-            if (streak.TaskId != id || streak.StreakType != streakType)
-            {
-                streak.TaskId = id;
-                streak.StreakType = streakType;
-                await _streakRepository.UpdateAsync(streak);
-            }
-
             // Reset if missed a cycle
             var maxGapDays = task.RecurrenceRule switch
             {
@@ -360,8 +351,7 @@ public class TasksController : ControllerBase
         if (!task.IsRecurring || task.RecurrenceRule == null)
             return BadRequest("Only recurring tasks can skip cycles.");
 
-        var streak = await _streakRepository.GetByTaskIdAsync(id)
-                     ?? await _streakRepository.GetByUserAndTypeAsync(userId, id.ToString());
+        var streak = await _streakRepository.GetByTaskIdAsync(id);
         if (streak != null)
             await _streakRepository.ResetAsync(streak.StreakId);
 
