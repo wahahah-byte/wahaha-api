@@ -239,6 +239,12 @@ public class TasksController : ControllerBase
         if (task.Status != ByteTaskStatus.pending)
             return BadRequest($"Task must be pending to check in — current status is {task.Status}.");
 
+        var clientToday = GetClientToday();
+
+        // Idempotency: refuse a second check-in inside the same daily cycle
+        if (task.DueDate.HasValue && task.DueDate.Value.Date > clientToday)
+            return BadRequest("Already checked in for this cycle.");
+
         // Award points up to recurring cap
         var alreadyEarned = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
 
@@ -318,7 +324,7 @@ public class TasksController : ControllerBase
         var updatedStreak = await _streakRepository.GetByIdAsync(streak.StreakId);
 
         // Advance to next due date and reset to pending
-        var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule);
+        var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule, clientToday);
         task.Status = ByteTaskStatus.pending;
         task.DueDate = nextDue;
         task.CompletedAt = null;
@@ -359,7 +365,7 @@ public class TasksController : ControllerBase
         if (streak != null)
             await _streakRepository.ResetAsync(streak.StreakId);
 
-        var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule);
+        var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule, GetClientToday());
         task.DueDate = nextDue;
         task.Submitted = false;
         await _taskRepository.UpdateAsync(task);
@@ -404,10 +410,11 @@ public class TasksController : ControllerBase
 
         return (pointsToday);
     }
-    private static DateTime? ComputeNextDueDate(DateTime? dueDate, string? rule)
+    private static DateTime? ComputeNextDueDate(DateTime? dueDate, string? rule, DateTime clientToday)
     {
-        var base_ = dueDate ?? DateTime.UtcNow;
-        base_ = new DateTime(base_.Year, base_.Month, base_.Day, 12, 0, 0, DateTimeKind.Utc);
+        var baseDate = dueDate?.Date ?? clientToday;
+        if (baseDate < clientToday) baseDate = clientToday;
+        var base_ = new DateTime(baseDate.Year, baseDate.Month, baseDate.Day, 12, 0, 0, DateTimeKind.Utc);
         switch (rule)
         {
             case "daily": base_ = base_.AddDays(1); break;
