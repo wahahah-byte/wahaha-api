@@ -6,6 +6,7 @@ using wahaha.API.Models.DTO           ;
 using wahaha.API.Models.Filters;
 using wahaha.API.Models.Pagination;
 using wahaha.API.Repositories.Interfaces;
+using wahaha.API.Services.Interfaces;
 
 namespace wahaha.API.Controllers;
 
@@ -18,16 +19,16 @@ public class TasksController : ControllerBase
     private readonly IPointTransactionRepository _pointTransactionRepository;
     private readonly IUserRepository _userRepository;
     private readonly IStreakRepository _streakRepository;
+    private readonly ITaskPenaltyService _penaltyService;
     private readonly IMapper _mapper;
     private readonly ILogger<TasksController> _logger;
-
-    private const int RecurringDailyPointCap = 50;
 
     public TasksController(
         ITaskRepository taskRepository,
         IPointTransactionRepository pointTransactionRepository,
         IUserRepository userRepository,
         IStreakRepository streakRepository,
+        ITaskPenaltyService penaltyService,
         IMapper mapper,
         ILogger<TasksController> logger)
     {
@@ -35,6 +36,7 @@ public class TasksController : ControllerBase
         _pointTransactionRepository = pointTransactionRepository;
         _userRepository = userRepository;
         _streakRepository = streakRepository;
+        _penaltyService = penaltyService;
         _mapper = mapper;
         _logger = logger;
     }
@@ -61,6 +63,9 @@ public class TasksController : ControllerBase
 
         var result = await _taskRepository.GetFilteredAsync(filters);
         var taskList = result.Data.ToList();
+
+        await _penaltyService.ApplyAndPersistAsync(taskList, GetClientToday());
+
         var dtos = _mapper.Map<List<TaskDto>>(taskList);
 
         for (var i = 0; i < taskList.Count; i++)
@@ -117,6 +122,10 @@ public class TasksController : ControllerBase
         if (dto.DueDate.HasValue && dto.DueDate.Value.Date < clientToday)
             return BadRequest("Due date cannot be in the past.");
 
+        var perTaskCap = Models.PointCaps.MaxFor(dto.Category);
+        if (dto.PointValue > perTaskCap)
+            return BadRequest($"{dto.Category} tasks are capped at {perTaskCap} points each.");
+
         var task = _mapper.Map<Models.Domain.Task>(dto);
         task.UserId = userId;
         task.Status = ByteTaskStatus.pending;
@@ -167,7 +176,36 @@ public class TasksController : ControllerBase
             dto.DueDate.Value.Date != task.DueDate?.Date)
             return BadRequest("Due date cannot be set to a past date.");
 
+        if ((DateTime.UtcNow - task.CreatedAt).TotalHours > 24)
+        {
+            if (!string.Equals(dto.Title?.Trim(), task.Title?.Trim(), StringComparison.Ordinal))
+                return BadRequest("Task title cannot be changed more than 24 hours after creation.");
+            if (dto.PointValue != task.PointValue)
+                return BadRequest("Task point value cannot be changed more than 24 hours after creation.");
+        }
+
+        if (dto.PointValue != task.PointValue || !string.Equals(dto.Category, task.Category, StringComparison.OrdinalIgnoreCase))
+        {
+            var perTaskCap = Models.PointCaps.MaxFor(dto.Category);
+            if (dto.PointValue > perTaskCap)
+                return BadRequest($"{dto.Category} tasks are capped at {perTaskCap} points each.");
+        }
+
+        if (Enum.TryParse<ByteTaskStatus>(dto.Status, true, out var resultingStatus))
+        {
+            var candidate = new Models.Domain.Task
+            {
+                Status = resultingStatus,
+                IsRecurring = dto.IsRecurring,
+                DueDate = dto.DueDate ?? task.DueDate,
+            };
+            if (_penaltyService.ShouldPenalize(candidate, clientToday))
+                return BadRequest($"Cannot keep this task in progress — its due date is more than {_penaltyService.OverdueThresholdDays - 1} days in the past. Reschedule it first.");
+        }
+
         _mapper.Map(dto, task);
+        if (task.WasPenalized && task.DueDate.HasValue && task.DueDate.Value.Date >= clientToday)
+            task.WasPenalized = false;
         await _taskRepository.UpdateAsync(task);
 
         _logger.LogInformation("Task {TaskId} updated successfully", id);
@@ -189,10 +227,26 @@ public class TasksController : ControllerBase
         if (task.Status != ByteTaskStatus.pending)
             return BadRequest($"Task cannot be started — current status is {task.Status}. Only pending tasks can be started.");
 
+        var clientToday = GetClientToday();
+        var startCandidate = new Models.Domain.Task
+        {
+            Status = ByteTaskStatus.in_progress,
+            IsRecurring = task.IsRecurring,
+            DueDate = task.DueDate,
+        };
+        if (_penaltyService.ShouldPenalize(startCandidate, clientToday))
+            return BadRequest($"Cannot start this task — its due date is more than {_penaltyService.OverdueThresholdDays - 1} days in the past. Reschedule it first.");
+
         var success = await _taskRepository.StartAsync(id);
 
         if (!success)
             return BadRequest("Task could not be started.");
+
+        if (task.WasPenalized)
+        {
+            task.WasPenalized = false;
+            await _taskRepository.UpdateAsync(task);
+        }
 
         _logger.LogInformation("Task {TaskId} started successfully", id);
         return NoContent();
@@ -241,19 +295,31 @@ public class TasksController : ControllerBase
 
         var clientToday = GetClientToday();
 
-        // Idempotency: refuse a second check-in inside the same daily cycle
-        if (task.DueDate.HasValue && task.DueDate.Value.Date > clientToday)
-            return BadRequest("Already checked in for this cycle.");
+        // Idempotency: refuse a second check-in inside the same cycle.
+        // The current cycle is (dueDate - period, dueDate]. If LastCheckInDate
+        // falls inside it, the user has already checked in.
+        if (task.LastCheckInDate.HasValue && task.DueDate.HasValue)
+        {
+            var cycleStart = GetCycleStart(task.DueDate.Value.Date, task.RecurrenceRule);
+            if (task.LastCheckInDate.Value.Date > cycleStart)
+                return BadRequest("Already checked in for this cycle.");
+        }
 
-        // Award points up to recurring cap
+        // Award points up to recurring cap and per-category daily cap (recurring bucket)
         var alreadyEarned = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
+        var alreadyEarnedInCategory = await _pointTransactionRepository.GetDailyEarnedByCategoryAsync(userId, DateTime.UtcNow, task.Category, SourceType.recurring_task);
 
-        if (alreadyEarned >= RecurringDailyPointCap)
+        if (alreadyEarned >= Models.PointCaps.RecurringDaily)
         {
             return BadRequest("Daily check-in limit reached.");
         }
-        var remaining = RecurringDailyPointCap - alreadyEarned;
-        var pointsToAward = Math.Max(0, Math.Min(task.PointValue, remaining));
+        var categoryRemaining = Models.PointCaps.PerCategoryRecurringDaily - alreadyEarnedInCategory;
+        if (categoryRemaining <= 0)
+        {
+            return BadRequest($"Daily recurring {task.Category} cap of {Models.PointCaps.PerCategoryRecurringDaily} pts reached.");
+        }
+        var sourceRemaining = Models.PointCaps.RecurringDaily - alreadyEarned;
+        var pointsToAward = Math.Max(0, Math.Min(task.PointValue, Math.Min(sourceRemaining, categoryRemaining)));
 
         if (pointsToAward > 0)
         {
@@ -263,6 +329,7 @@ public class TasksController : ControllerBase
                 Amount = pointsToAward,
                 Type = TransactionType.EARN,
                 SourceType = SourceType.recurring_task,
+                Category = task.Category,
                 Description = $"Check-in: {task.Title}",
                 CreatedAt = DateTime.UtcNow
             };
@@ -320,6 +387,7 @@ public class TasksController : ControllerBase
         task.DueDate = nextDue;
         task.CompletedAt = null;
         task.Submitted = false;
+        task.LastCheckInDate = clientToday;
         await _taskRepository.UpdateAsync(task);
 
         var user = await _userRepository.GetByIdAsync(userId);
@@ -371,7 +439,6 @@ public class TasksController : ControllerBase
         var userId = GetCurrentUserId();
 
         var task = await _taskRepository.GetByIdAsync(id);
-        var streak = await _streakRepository.GetByTaskIdAsync(id);
 
         if (task == null || task.UserId != GetCurrentUserId())
         {
@@ -379,15 +446,7 @@ public class TasksController : ControllerBase
             return NotFound($"Task with ID {id} was not found.");
         }
 
-        if (task.IsRecurring)
-        {
-            if (streak == null || streak.UserId != GetCurrentUserId())
-            {
-                _logger.LogWarning("Streak for Task: {TaskId} not found or unauthorized for deletion", task.TaskId);
-                return NotFound($"Streak was not found.");
-            }
-            await _streakRepository.DeleteAsync(streak!.StreakId);
-        }
+        await _streakRepository.DeleteByTaskIdAsync(id);
         await _taskRepository.DeleteAsync(id);
         _logger.LogInformation("Task {TaskId} deleted successfully", id);
         return NoContent();
@@ -400,6 +459,20 @@ public class TasksController : ControllerBase
 
         return (pointsToday);
     }
+    private static DateTime GetCycleStart(DateTime dueDate, string? rule)
+    {
+        var d = dueDate.Date;
+        return rule switch
+        {
+            "daily"    => d.AddDays(-1),
+            "weekdays" => d.AddDays(-1),
+            "weekly"   => d.AddDays(-7),
+            "biweekly" => d.AddDays(-14),
+            "monthly"  => d.AddMonths(-1),
+            _          => d.AddDays(-1),
+        };
+    }
+
     private static DateTime? ComputeNextDueDate(DateTime? dueDate, string? rule, DateTime clientToday)
     {
         var baseDate = dueDate?.Date ?? clientToday;

@@ -74,17 +74,20 @@ public class MappingProfile : Profile
         CreateMap<Models.Domain.Task, TaskDto>()
           .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => src.Priority.ToString()))
           .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
-          .ForMember(dest => dest.Submitted, opt => opt.MapFrom(src => src.Submitted));
+          .ForMember(dest => dest.Submitted, opt => opt.MapFrom(src => src.Submitted))
+          .ForMember(dest => dest.WasPenalized, opt => opt.MapFrom(src => src.WasPenalized));
 
         CreateMap<CreateTaskDto, Models.Domain.Task>()
             .ForMember(dest => dest.TaskId, opt => opt.MapFrom(src => Guid.NewGuid()))
             .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => Enum.Parse<Priority>(src.Priority, true)))
             .ForMember(dest => dest.Status, opt => opt.MapFrom(src => Enum.Parse<ByteTaskStatus>(src.Status, true)))
-            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+            .ForMember(dest => dest.WasPenalized, opt => opt.Ignore());
 
         CreateMap<UpdateTaskDto, Models.Domain.Task>()
             .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => Enum.Parse<Priority>(src.Priority, true)))
-            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => Enum.Parse<ByteTaskStatus>(src.Status, true)));
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => Enum.Parse<ByteTaskStatus>(src.Status, true)))
+            .ForMember(dest => dest.WasPenalized, opt => opt.Ignore());
 
         // UserInventory
         CreateMap<UserInventory, UserInventoryDto>()
