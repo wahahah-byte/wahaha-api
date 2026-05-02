@@ -74,6 +74,17 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         };
     }
 
+    public async Task<IEnumerable<Models.Domain.Task>> GetPenaltyCandidatesAsync(DateTime cutoffDate)
+    {
+        _logger.LogDebug("Fetching penalty candidates with due date before {Cutoff:yyyy-MM-dd}", cutoffDate);
+        return await _dbSet
+            .Where(t => t.Status == ByteTaskStatus.in_progress
+                     && !t.IsRecurring
+                     && t.DueDate.HasValue
+                     && t.DueDate.Value < cutoffDate)
+            .ToListAsync();
+    }
+
     public async Task<bool> StartAsync(Guid id)
     {
         _logger.LogInformation("Starting task {TaskId}", id);

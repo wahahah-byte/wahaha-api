@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Text;
 using System.Text.Json.Serialization;
+using wahaha.API.BackgroundServices;
 using wahaha.API.Data;
 using wahaha.API.Middleware;
 using wahaha.API.Models.Auth;
@@ -126,6 +127,9 @@ builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IBlobService, BlobService>();
+builder.Services.AddScoped<ITaskPenaltyService, TaskPenaltyService>();
+
+builder.Services.AddHostedService<PenaltyJob>();
 
 
 builder.Services.AddApplicationInsightsTelemetry(options =>

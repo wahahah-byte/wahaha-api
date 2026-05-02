@@ -12,4 +12,5 @@ public interface IStreakRepository : IRepository<Streak, int>
     Task<bool> IncrementAsync(int id);
     Task<bool> ResetAsync(int id);
     Task<Streak?> GetByTaskIdAsync(Guid taskId);
+    Task<int> DeleteByTaskIdAsync(Guid taskId);
 }

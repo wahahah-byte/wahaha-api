@@ -9,6 +9,7 @@ public class PointTransactionDto
     public string? SourceType { get; set; }
     public int? SourceId { get; set; }
     public string? Description { get; set; }
+    public string? Category { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

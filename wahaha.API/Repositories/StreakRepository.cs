@@ -96,7 +96,18 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
     }
 
     public async Task<Streak?> GetByTaskIdAsync(Guid taskId)
-        => await _dbSet.FirstOrDefaultAsync(s => s.TaskId == taskId && s.IsActive);
+        => await _dbSet.FirstOrDefaultAsync(s => s.TaskId == taskId);
+
+    public async Task<int> DeleteByTaskIdAsync(Guid taskId)
+    {
+        _logger.LogInformation("Deleting all streaks for task {TaskId}", taskId);
+        var streaks = await _dbSet.Where(s => s.TaskId == taskId).ToListAsync();
+        if (streaks.Count == 0) return 0;
+        _dbSet.RemoveRange(streaks);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Deleted {Count} streak(s) for task {TaskId}", streaks.Count, taskId);
+        return streaks.Count;
+    }
 
     public async Task<bool> ResetAsync(int id)
     {

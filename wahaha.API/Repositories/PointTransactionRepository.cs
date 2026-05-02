@@ -54,6 +54,20 @@ public class PointTransactionRepository : Repository<PointTransaction, int>, IPo
             .SumAsync(pt => pt.Amount);
     }
 
+    public async Task<int> GetDailyEarnedByCategoryAsync(Guid userId, DateTime utcDate, string category, SourceType sourceType)
+    {
+        var dayStart = utcDate.Date;
+        var dayEnd = dayStart.AddDays(1);
+        return await _dbSet
+            .Where(pt => pt.UserId == userId
+                      && pt.Type == TransactionType.EARN
+                      && pt.SourceType == sourceType
+                      && pt.Category == category
+                      && pt.CreatedAt >= dayStart
+                      && pt.CreatedAt < dayEnd)
+            .SumAsync(pt => pt.Amount);
+    }
+
     public async Task<PagedResult<PointTransaction>> GetFilteredAsync(PointTransactionFilterParams filters)
     {
         _logger.LogDebug("Fetching point transactions with filters: UserId={UserId}, Type={Type}, SourceType={SourceType}",

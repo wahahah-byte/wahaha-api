@@ -34,9 +34,6 @@ public class PointsController : ControllerBase
         return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
     }
 
-    private const int RegularDailyPointCap = 150;
-    private const int RecurringDailyPointCap = 50;
-
     [HttpPost("submit")]
     public async Task<ActionResult<SubmitPointsResponse>> Submit([FromBody] SubmitPointsRequest request)
     {
@@ -49,13 +46,37 @@ public class PointsController : ControllerBase
         var alreadyEarnedRegularToday = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.task);
         var alreadyEarnedRecurringToday = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
 
-        var remainingRegularCap = RegularDailyPointCap - alreadyEarnedRegularToday;
-        var remainingRecurringCap = RecurringDailyPointCap - alreadyEarnedRecurringToday;
+        var remainingRegularCap = Models.PointCaps.RegularDaily - alreadyEarnedRegularToday;
+        var remainingRecurringCap = Models.PointCaps.RecurringDaily - alreadyEarnedRecurringToday;
 
         var regularPointsAwarded = 0;
         var recurringPointsAwarded = 0;
         var transactions = new List<PointTransactionDto>();
         var errors = new List<string>();
+        var results = new List<TaskSubmissionResult>();
+
+        void AddFailure(string taskId, string err)
+        {
+            errors.Add(err);
+            results.Add(new TaskSubmissionResult { TaskId = taskId, Awarded = 0, Error = err });
+        }
+
+        // Per-category daily earned, split by source type, fetched lazily and tracked through this submission
+        var categoryEarnedRegular = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var categoryEarnedRecurring = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        async Task<int> GetCategoryRemaining(string category, SourceType sourceType)
+        {
+            var (cache, cap) = sourceType == SourceType.recurring_task
+                ? (categoryEarnedRecurring, Models.PointCaps.PerCategoryRecurringDaily)
+                : (categoryEarnedRegular, Models.PointCaps.PerCategoryRegularDaily);
+            if (!cache.TryGetValue(category, out var earned))
+            {
+                earned = await _pointTransactionRepository.GetDailyEarnedByCategoryAsync(userId, DateTime.UtcNow, category, sourceType);
+                cache[category] = earned;
+            }
+            return cap - earned;
+        }
 
         // Fetch existing transactions once for duplicate checks on regular tasks
         var existingTransactions = await _pointTransactionRepository.GetByUserAsync(userId);
@@ -64,7 +85,7 @@ public class PointsController : ControllerBase
         {
             if (!Guid.TryParse(taskIdStr, out var taskId))
             {
-                errors.Add($"Invalid task ID format: {taskIdStr}");
+                AddFailure(taskIdStr, $"Invalid task ID format: {taskIdStr}");
                 continue;
             }
 
@@ -73,14 +94,14 @@ public class PointsController : ControllerBase
             if (task == null || task.UserId != userId)
             {
                 _logger.LogWarning("Task {TaskId} not found or does not belong to user {UserId}", taskId, userId);
-                errors.Add($"Task {taskIdStr} was not found.");
+                AddFailure(taskIdStr, $"Task {taskIdStr} was not found.");
                 continue;
             }
 
             if (task.Status != ByteTaskStatus.completed)
             {
                 _logger.LogWarning("Task {TaskId} is not completed — status is {Status}", taskId, task.Status);
-                errors.Add($"Task '{task.Title}' is not completed yet.");
+                AddFailure(taskIdStr, $"Task '{task.Title}' is not completed yet.");
                 continue;
             }
 
@@ -92,10 +113,16 @@ public class PointsController : ControllerBase
                 var remainingForTask = remainingRecurringCap - recurringPointsAwarded;
                 if (remainingForTask <= 0)
                 {
-                    errors.Add($"Recurring daily limit of {RecurringDailyPointCap} reached — '{task.Title}' was not awarded points.");
+                    AddFailure(taskIdStr, $"Recurring daily limit of {Models.PointCaps.RecurringDaily} reached — '{task.Title}' was not awarded points.");
                     continue;
                 }
-                pointsToAward = Math.Min(task.PointValue, remainingForTask);
+                var categoryRemaining = await GetCategoryRemaining(task.Category, SourceType.recurring_task);
+                if (categoryRemaining <= 0)
+                {
+                    AddFailure(taskIdStr, $"Daily recurring {task.Category} cap of {Models.PointCaps.PerCategoryRecurringDaily} pts reached — '{task.Title}' was not awarded points.");
+                    continue;
+                }
+                pointsToAward = Math.Min(task.PointValue, Math.Min(remainingForTask, categoryRemaining));
                 sourceType = SourceType.recurring_task;
             }
             else
@@ -107,17 +134,23 @@ public class PointsController : ControllerBase
                 if (alreadySubmitted)
                 {
                     _logger.LogWarning("Points already submitted for task {TaskId}", taskId);
-                    errors.Add($"Points for task '{task.Title}' have already been submitted.");
+                    AddFailure(taskIdStr, $"Points for task '{task.Title}' have already been submitted.");
                     continue;
                 }
 
                 var remainingForTask = remainingRegularCap - regularPointsAwarded;
                 if (remainingForTask <= 0)
                 {
-                    errors.Add($"Regular daily limit of {RegularDailyPointCap} reached — remaining tasks were not awarded points.");
-                    break;
+                    AddFailure(taskIdStr, $"Regular daily limit of {Models.PointCaps.RegularDaily} reached — '{task.Title}' was not awarded points.");
+                    continue;
                 }
-                pointsToAward = Math.Min(task.PointValue, remainingForTask);
+                var categoryRemaining = await GetCategoryRemaining(task.Category, SourceType.task);
+                if (categoryRemaining <= 0)
+                {
+                    AddFailure(taskIdStr, $"Daily {task.Category} cap of {Models.PointCaps.PerCategoryRegularDaily} pts reached — '{task.Title}' was not awarded points.");
+                    continue;
+                }
+                pointsToAward = Math.Min(task.PointValue, Math.Min(remainingForTask, categoryRemaining));
                 sourceType = SourceType.task;
             }
 
@@ -127,6 +160,7 @@ public class PointsController : ControllerBase
                 Amount = pointsToAward,
                 Type = TransactionType.EARN,
                 SourceType = sourceType,
+                Category = task.Category,
                 Description = $"Points earned for completing: {task.Title}",
                 CreatedAt = DateTime.UtcNow
             };
@@ -138,6 +172,9 @@ public class PointsController : ControllerBase
             else
                 regularPointsAwarded += pointsToAward;
 
+            var earnedCache = sourceType == SourceType.recurring_task ? categoryEarnedRecurring : categoryEarnedRegular;
+            earnedCache[task.Category] = earnedCache[task.Category] + pointsToAward;
+
             task.Submitted = true;
             await _taskRepository.UpdateAsync(task);
             transactions.Add(new PointTransactionDto
@@ -147,9 +184,11 @@ public class PointsController : ControllerBase
                 Amount = created.Amount,
                 Type = created.Type.ToString(),
                 SourceType = created.SourceType?.ToString(),
+                Category = created.Category,
                 Description = created.Description,
                 CreatedAt = created.CreatedAt
             });
+            results.Add(new TaskSubmissionResult { TaskId = taskIdStr, Awarded = pointsToAward, Error = null });
 
             _logger.LogInformation("Created transaction for task {TaskId} ({Type}) — {Points} points", taskId, sourceType, pointsToAward);
         }
@@ -166,7 +205,7 @@ public class PointsController : ControllerBase
         _logger.LogInformation(
             "User {UserId} earned {Total} pts ({Regular} regular, {Recurring} recurring). Totals: {RegTotal}/{RegCap} regular, {RecTotal}/{RecCap} recurring",
             userId, totalPoints, regularPointsAwarded, recurringPointsAwarded,
-            newRegularTotal, RegularDailyPointCap, newRecurringTotal, RecurringDailyPointCap);
+            newRegularTotal, Models.PointCaps.RegularDaily, newRecurringTotal, Models.PointCaps.RecurringDaily);
 
         return Ok(new SubmitPointsResponse
         {
@@ -175,7 +214,8 @@ public class PointsController : ControllerBase
             DailyTotal = newRegularTotal + newRecurringTotal,
             RecurringDailyTotal = newRecurringTotal,
             Transactions = transactions,
-            Errors = errors
+            Errors = errors,
+            Results = results
         });
     }
 }

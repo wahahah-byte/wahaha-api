@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wahaha.API.Data;
 
@@ -11,9 +12,10 @@ using wahaha.API.Data;
 namespace wahaha.API.Migrations
 {
     [DbContext(typeof(WahahaDbContext))]
-    partial class WahahaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260502000000_AddTaskLastCheckInDate")]
+    partial class AddTaskLastCheckInDate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -454,11 +456,6 @@ namespace wahaha.API.Migrations
                     b.Property<int>("Amount")
                         .HasColumnType("int")
                         .HasColumnName("amount");
-
-                    b.Property<string>("Category")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("category");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")

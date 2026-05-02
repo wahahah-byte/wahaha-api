@@ -58,6 +58,13 @@ public class Task
     [Column("recurrence_rule")]
     public string? RecurrenceRule { get; set; }
 
+    [Required]
+    [Column("was_penalized")]
+    public bool WasPenalized { get; set; } = false;
+
+    [Column("last_check_in_date")]
+    public DateTime? LastCheckInDate { get; set; }
+
     // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }

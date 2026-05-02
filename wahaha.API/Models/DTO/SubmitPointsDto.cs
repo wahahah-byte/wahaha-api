@@ -25,4 +25,12 @@ public class SubmitPointsResponse
     public int RecurringDailyTotal { get; set; }
     public List<PointTransactionDto> Transactions { get; set; } = new();
     public List<string> Errors { get; set; } = new();
+    public List<TaskSubmissionResult> Results { get; set; } = new();
+}
+
+public class TaskSubmissionResult
+{
+    public string TaskId { get; set; } = string.Empty;
+    public int Awarded { get; set; }
+    public string? Error { get; set; }
 }

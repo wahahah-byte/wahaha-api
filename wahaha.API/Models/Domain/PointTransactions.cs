@@ -31,6 +31,10 @@ public class PointTransaction
     [Column("description")]
     public string? Description { get; set; }
 
+    [MaxLength(50)]
+    [Column("category")]
+    public string? Category { get; set; }
+
     [Required]
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
