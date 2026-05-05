@@ -432,6 +432,47 @@ public class TasksController : ControllerBase
         return Ok(new { nextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty, streakReset = true, streakCount = 0 });
     }
 
+    [HttpPatch("{id}/archive")]
+    public async Task<IActionResult> Archive(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        var task = await _taskRepository.GetByIdAsync(id);
+
+        if (task == null || task.UserId != userId)
+        {
+            _logger.LogWarning("Task {TaskId} not found or unauthorized for archive", id);
+            return NotFound($"Task with ID {id} was not found.");
+        }
+
+        if (task.Status != ByteTaskStatus.completed)
+            return BadRequest("Only completed tasks can be archived.");
+
+        var success = await _taskRepository.SetArchivedAsync(id, true);
+        if (!success) return BadRequest("Task could not be archived.");
+
+        _logger.LogInformation("Task {TaskId} archived by user {UserId}", id, userId);
+        return NoContent();
+    }
+
+    [HttpPatch("{id}/unarchive")]
+    public async Task<IActionResult> Unarchive(Guid id)
+    {
+        var userId = GetCurrentUserId();
+        var task = await _taskRepository.GetByIdAsync(id);
+
+        if (task == null || task.UserId != userId)
+        {
+            _logger.LogWarning("Task {TaskId} not found or unauthorized for unarchive", id);
+            return NotFound($"Task with ID {id} was not found.");
+        }
+
+        var success = await _taskRepository.SetArchivedAsync(id, false);
+        if (!success) return BadRequest("Task could not be unarchived.");
+
+        _logger.LogInformation("Task {TaskId} unarchived by user {UserId}", id, userId);
+        return NoContent();
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(Guid id)
     {

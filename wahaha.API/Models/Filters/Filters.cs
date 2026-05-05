@@ -59,6 +59,7 @@ public class TaskFilterParams : PaginationParams
     public string? Priority { get; set; }
     public string? Category { get; set; }
     public bool? IsRecurring { get; set; }
+    public bool? IsArchived { get; set; }
 }
 
 public class UserInventoryFilterParams : PaginationParams

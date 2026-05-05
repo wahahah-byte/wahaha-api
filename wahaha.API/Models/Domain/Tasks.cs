@@ -65,6 +65,10 @@ public class Task
     [Column("last_check_in_date")]
     public DateTime? LastCheckInDate { get; set; }
 
+    [Required]
+    [Column("is_archived")]
+    public bool IsArchived { get; set; } = false;
+
     // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }

@@ -31,8 +31,8 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
 
     public async Task<PagedResult<Models.Domain.Task>> GetFilteredAsync(TaskFilterParams filters)
     {
-        _logger.LogDebug("Fetching tasks with filters: UserId={UserId}, Status={Status}, Priority={Priority}, Category={Category}",
-            filters.UserId, filters.Status, filters.Priority, filters.Category);
+        _logger.LogDebug("Fetching tasks with filters: UserId={UserId}, Status={Status}, Priority={Priority}, Category={Category}, IsArchived={IsArchived}",
+            filters.UserId, filters.Status, filters.Priority, filters.Category, filters.IsArchived);
 
         IQueryable<Models.Domain.Task> query;
         if (filters.UserId.HasValue)
@@ -55,6 +55,10 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
             query = query.Where(t => t.Category.ToLower() == filters.Category.ToLower());
         if (filters.IsRecurring.HasValue)
             query = query.Where(t => t.IsRecurring == filters.IsRecurring.Value);
+
+        // Default: exclude archived unless caller explicitly opts in (or asks for archived only).
+        var archivedFilter = filters.IsArchived ?? false;
+        query = query.Where(t => t.IsArchived == archivedFilter);
 
         var totalCount = await query.CountAsync();
         var data = await query
@@ -132,5 +136,38 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         await _context.SaveChangesAsync();
         _logger.LogInformation("Task {TaskId} completed successfully", id);
         return true;
+    }
+
+    public async Task<bool> SetArchivedAsync(Guid id, bool isArchived)
+    {
+        var task = await _dbSet.FindAsync(id);
+        if (task == null)
+        {
+            _logger.LogWarning("Task {TaskId} not found for archive flip to {IsArchived}", id, isArchived);
+            return false;
+        }
+        if (task.IsArchived == isArchived) return true;
+
+        task.IsArchived = isArchived;
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Task {TaskId} archive flag set to {IsArchived}", id, isArchived);
+        return true;
+    }
+
+    public async Task<int> AutoArchiveAsync(DateTime cutoffDate)
+    {
+        _logger.LogDebug("Auto-archiving completed tasks with completed_at < {Cutoff:yyyy-MM-dd}", cutoffDate);
+        var candidates = await _dbSet
+            .Where(t => !t.IsArchived
+                     && t.Status == ByteTaskStatus.completed
+                     && t.CompletedAt.HasValue
+                     && t.CompletedAt.Value < cutoffDate)
+            .ToListAsync();
+
+        if (candidates.Count == 0) return 0;
+
+        foreach (var t in candidates) t.IsArchived = true;
+        await _context.SaveChangesAsync();
+        return candidates.Count;
     }
 }

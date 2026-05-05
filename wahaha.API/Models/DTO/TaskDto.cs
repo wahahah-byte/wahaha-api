@@ -20,6 +20,7 @@ public class TaskDto
     public int? CurrentStreakCount { get; set; }
     public int? LongestStreakCount { get; set; }
     public DateTime? LastCheckInDate { get; set; }
+    public bool IsArchived { get; set; } = false;
 }
 
 public class CreateTaskDto

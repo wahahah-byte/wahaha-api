@@ -11,4 +11,6 @@ public interface ITaskRepository : IRepository<Models.Domain.Task, Guid>
     Task<IEnumerable<Models.Domain.Task>> GetPenaltyCandidatesAsync(DateTime cutoffDate);
     Task<bool> StartAsync(Guid id);
     Task<bool> CompleteAsync(Guid id);
+    Task<bool> SetArchivedAsync(Guid id, bool isArchived);
+    Task<int> AutoArchiveAsync(DateTime cutoffDate);
 }

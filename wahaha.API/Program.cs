@@ -130,6 +130,7 @@ builder.Services.AddScoped<IBlobService, BlobService>();
 builder.Services.AddScoped<ITaskPenaltyService, TaskPenaltyService>();
 
 builder.Services.AddHostedService<PenaltyJob>();
+builder.Services.AddHostedService<ArchiveJob>();
 
 
 builder.Services.AddApplicationInsightsTelemetry(options =>
