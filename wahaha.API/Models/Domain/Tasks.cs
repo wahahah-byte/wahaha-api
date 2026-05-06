@@ -73,6 +73,7 @@ public class Task
     [ForeignKey("UserId")]
     public Users? User { get; set; }
     public ICollection<Streak> Streaks { get; set; } = new List<Streak>();
+    public ICollection<Subtask> Subtasks { get; set; } = new List<Subtask>();
 }
 public enum Priority
 {

@@ -14,17 +14,20 @@ public class PointsController : ControllerBase
     private readonly ITaskRepository _taskRepository;
     private readonly IPointTransactionRepository _pointTransactionRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IStreakRepository _streakRepository;
     private readonly ILogger<PointsController> _logger;
 
     public PointsController(
         ITaskRepository taskRepository,
         IPointTransactionRepository pointTransactionRepository,
         IUserRepository userRepository,
+        IStreakRepository streakRepository,
         ILogger<PointsController> logger)
     {
         _taskRepository = taskRepository;
         _pointTransactionRepository = pointTransactionRepository;
         _userRepository = userRepository;
+        _streakRepository = streakRepository;
         _logger = logger;
     }
 
@@ -58,7 +61,7 @@ public class PointsController : ControllerBase
         void AddFailure(string taskId, string err)
         {
             errors.Add(err);
-            results.Add(new TaskSubmissionResult { TaskId = taskId, Awarded = 0, Error = err });
+            results.Add(new TaskSubmissionResult { TaskId = taskId, Awarded = 0, BasePoints = 0, BonusMultiplier = 1.0m, Error = err });
         }
 
         // Per-category daily earned, split by source type, fetched lazily and tracked through this submission
@@ -106,6 +109,8 @@ public class PointsController : ControllerBase
             }
 
             int pointsToAward;
+            int basePoints = task.PointValue;
+            decimal bonusMultiplier = 1.0m;
             SourceType sourceType;
 
             if (task.IsRecurring)
@@ -122,7 +127,13 @@ public class PointsController : ControllerBase
                     AddFailure(taskIdStr, $"Daily recurring {task.Category} cap of {Models.PointCaps.PerCategoryRecurringDaily} pts reached — '{task.Title}' was not awarded points.");
                     continue;
                 }
-                pointsToAward = Math.Min(task.PointValue, Math.Min(remainingForTask, categoryRemaining));
+                // Apply streak multiplier (multiplier first, then caps clamp the result —
+                // matches CheckIn semantics so a bonus can be partially eaten by the cap
+                // but never exceeds it).
+                var streak = await _streakRepository.GetByTaskIdAsync(taskId);
+                bonusMultiplier = streak?.BonusMultiplier ?? 1.0m;
+                var multipliedPoints = (int)Math.Round(basePoints * (double)bonusMultiplier, MidpointRounding.AwayFromZero);
+                pointsToAward = Math.Min(multipliedPoints, Math.Min(remainingForTask, categoryRemaining));
                 sourceType = SourceType.recurring_task;
             }
             else
@@ -161,7 +172,9 @@ public class PointsController : ControllerBase
                 Type = TransactionType.EARN,
                 SourceType = sourceType,
                 Category = task.Category,
-                Description = $"Points earned for completing: {task.Title}",
+                Description = bonusMultiplier > 1.0m
+                    ? $"Points earned for completing: {task.Title} ({basePoints} × {bonusMultiplier:0.0#}x streak)"
+                    : $"Points earned for completing: {task.Title}",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -188,7 +201,7 @@ public class PointsController : ControllerBase
                 Description = created.Description,
                 CreatedAt = created.CreatedAt
             });
-            results.Add(new TaskSubmissionResult { TaskId = taskIdStr, Awarded = pointsToAward, Error = null });
+            results.Add(new TaskSubmissionResult { TaskId = taskIdStr, Awarded = pointsToAward, BasePoints = basePoints, BonusMultiplier = bonusMultiplier, Error = null });
 
             _logger.LogInformation("Created transaction for task {TaskId} ({Type}) — {Points} points", taskId, sourceType, pointsToAward);
         }

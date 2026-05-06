@@ -21,6 +21,7 @@ public class TaskDto
     public int? LongestStreakCount { get; set; }
     public DateTime? LastCheckInDate { get; set; }
     public bool IsArchived { get; set; } = false;
+    public List<SubtaskDto> Subtasks { get; set; } = new();
 }
 
 public class CreateTaskDto

@@ -70,12 +70,17 @@ public class MappingProfile : Profile
         CreateMap<CreateStreakDto, Streak>()
             .ForMember(dest => dest.LastActivityDate, opt => opt.MapFrom(src => DateTime.UtcNow));
 
+        // Subtask
+        CreateMap<Subtask, SubtaskDto>();
+
         // Task
         CreateMap<Models.Domain.Task, TaskDto>()
           .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => src.Priority.ToString()))
           .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
           .ForMember(dest => dest.Submitted, opt => opt.MapFrom(src => src.Submitted))
-          .ForMember(dest => dest.WasPenalized, opt => opt.MapFrom(src => src.WasPenalized));
+          .ForMember(dest => dest.WasPenalized, opt => opt.MapFrom(src => src.WasPenalized))
+          .ForMember(dest => dest.Subtasks, opt => opt.MapFrom(src =>
+              src.Subtasks.OrderBy(s => s.SortOrder).ThenBy(s => s.CreatedAt)));
 
         CreateMap<CreateTaskDto, Models.Domain.Task>()
             .ForMember(dest => dest.TaskId, opt => opt.MapFrom(src => Guid.NewGuid()))

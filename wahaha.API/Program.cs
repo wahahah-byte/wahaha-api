@@ -122,6 +122,7 @@ builder.Services.AddScoped<IMinigameRepository, MinigameRepository>();
 builder.Services.AddScoped<IMinigameSessionRepository, MinigameSessionRepository>();
 builder.Services.AddScoped<IPointTransactionRepository, PointTransactionRepository>();
 builder.Services.AddScoped<IStreakRepository, StreakRepository>();
+builder.Services.AddScoped<ISubtaskRepository, SubtaskRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
 builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 

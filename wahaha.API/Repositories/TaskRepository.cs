@@ -12,6 +12,13 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
     public TaskRepository(WahahaDbContext context, ILogger<TaskRepository> logger)
         : base(context, logger) { }
 
+    public override async Task<Models.Domain.Task?> GetByIdAsync(Guid id)
+    {
+        return await _dbSet
+            .Include(t => t.Subtasks)
+            .FirstOrDefaultAsync(t => t.TaskId == id);
+    }
+
     public async Task<IEnumerable<Models.Domain.Task>> GetByUserAsync(Guid userId)
     {
         _logger.LogDebug("Fetching tasks for user {UserId}", userId);
@@ -38,11 +45,13 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         if (filters.UserId.HasValue)
         {
             var uid = filters.UserId.Value;
-            query = _dbSet.Include(t => t.Streaks.Where(s => s.UserId == uid && s.IsActive));
+            query = _dbSet
+                .Include(t => t.Streaks.Where(s => s.UserId == uid && s.IsActive))
+                .Include(t => t.Subtasks);
         }
         else
         {
-            query = _dbSet.AsQueryable();
+            query = _dbSet.Include(t => t.Subtasks);
         }
 
         if (filters.UserId.HasValue)

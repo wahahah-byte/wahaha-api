@@ -14,6 +14,7 @@ public class WahahaDbContext: DbContext
     public DbSet<MinigameSession> MinigameSessions { get; set; }
     public DbSet<PointTransaction> PointTransactions { get; set; }
     public DbSet<Streak> Streaks { get; set; }
+    public DbSet<Subtask> Subtasks { get; set; }
     public DbSet<Models.Domain.Task> Tasks { get; set; }
     public DbSet<UserInventory> UserInventories { get; set; }
     public DbSet<Users> Users { get; set; }
@@ -59,5 +60,14 @@ public class WahahaDbContext: DbContext
         modelBuilder.Entity<MinigameSession>()
             .Property(ms => ms.Outcome)
             .HasConversion<string>();
+
+        modelBuilder.Entity<Subtask>()
+            .HasOne(s => s.Task)
+            .WithMany(t => t.Subtasks)
+            .HasForeignKey(s => s.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Subtask>()
+            .HasIndex(s => s.TaskId);
     }
 }

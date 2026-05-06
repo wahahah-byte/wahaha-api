@@ -3,6 +3,7 @@ namespace wahaha.API.Models.DTO;
 public class CheckInResponse
 {
     public int PointsAwarded { get; set; }
+    public int BasePoints { get; set; }
     public int NewBalance { get; set; }
     public int RecurringDailyTotal { get; set; }
     public int StreakCount { get; set; }
@@ -32,5 +33,7 @@ public class TaskSubmissionResult
 {
     public string TaskId { get; set; } = string.Empty;
     public int Awarded { get; set; }
+    public int BasePoints { get; set; }
+    public decimal BonusMultiplier { get; set; } = 1.0m;
     public string? Error { get; set; }
 }

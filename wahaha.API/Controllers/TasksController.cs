@@ -305,41 +305,9 @@ public class TasksController : ControllerBase
                 return BadRequest("Already checked in for this cycle.");
         }
 
-        // Award points up to recurring cap and per-category daily cap (recurring bucket)
-        var alreadyEarned = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
-        var alreadyEarnedInCategory = await _pointTransactionRepository.GetDailyEarnedByCategoryAsync(userId, DateTime.UtcNow, task.Category, SourceType.recurring_task);
-
-        if (alreadyEarned >= Models.PointCaps.RecurringDaily)
-        {
-            return BadRequest("Daily check-in limit reached.");
-        }
-        var categoryRemaining = Models.PointCaps.PerCategoryRecurringDaily - alreadyEarnedInCategory;
-        if (categoryRemaining <= 0)
-        {
-            return BadRequest($"Daily recurring {task.Category} cap of {Models.PointCaps.PerCategoryRecurringDaily} pts reached.");
-        }
-        var sourceRemaining = Models.PointCaps.RecurringDaily - alreadyEarned;
-        var pointsToAward = Math.Max(0, Math.Min(task.PointValue, Math.Min(sourceRemaining, categoryRemaining)));
-
-        if (pointsToAward > 0)
-        {
-            var transaction = new PointTransaction
-            {
-                UserId = userId,
-                Amount = pointsToAward,
-                Type = TransactionType.EARN,
-                SourceType = SourceType.recurring_task,
-                Category = task.Category,
-                Description = $"Check-in: {task.Title}",
-                CreatedAt = DateTime.UtcNow
-            };
-            await _pointTransactionRepository.CreateAsync(transaction);
-            await _userRepository.AddPointsAsync(userId, pointsToAward);
-        }
-
-        var newRecurringTotal = alreadyEarned + pointsToAward;
-
-        // Find or create streak by TaskId FK
+        // Find or create streak by TaskId FK. We do this BEFORE points calc so the
+        // post-increment BonusMultiplier can scale this check-in's award (the user
+        // sees the tier they just unlocked, not the previous one).
         var streakType = $"{task.RecurrenceRule}_{task.Category}";
         var streak = await _streakRepository.GetByTaskIdAsync(id);
         var streakReset = false;
@@ -380,6 +348,47 @@ public class TasksController : ControllerBase
 
         await _streakRepository.IncrementAsync(streak.StreakId);
         var updatedStreak = await _streakRepository.GetByIdAsync(streak.StreakId);
+        var bonusMultiplier = updatedStreak?.BonusMultiplier ?? 1.0m;
+
+        // Award points up to recurring cap and per-category daily cap (recurring bucket).
+        // Multiplier is applied to the base point value first, then caps clamp the result —
+        // so a bonus can be partially eaten by the cap but never exceeds it.
+        var alreadyEarned = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
+        var alreadyEarnedInCategory = await _pointTransactionRepository.GetDailyEarnedByCategoryAsync(userId, DateTime.UtcNow, task.Category, SourceType.recurring_task);
+
+        if (alreadyEarned >= Models.PointCaps.RecurringDaily)
+        {
+            return BadRequest("Daily check-in limit reached.");
+        }
+        var categoryRemaining = Models.PointCaps.PerCategoryRecurringDaily - alreadyEarnedInCategory;
+        if (categoryRemaining <= 0)
+        {
+            return BadRequest($"Daily recurring {task.Category} cap of {Models.PointCaps.PerCategoryRecurringDaily} pts reached.");
+        }
+        var sourceRemaining = Models.PointCaps.RecurringDaily - alreadyEarned;
+        var basePoints = task.PointValue;
+        var multipliedPoints = (int)Math.Round(basePoints * (double)bonusMultiplier, MidpointRounding.AwayFromZero);
+        var pointsToAward = Math.Max(0, Math.Min(multipliedPoints, Math.Min(sourceRemaining, categoryRemaining)));
+
+        if (pointsToAward > 0)
+        {
+            var transaction = new PointTransaction
+            {
+                UserId = userId,
+                Amount = pointsToAward,
+                Type = TransactionType.EARN,
+                SourceType = SourceType.recurring_task,
+                Category = task.Category,
+                Description = bonusMultiplier > 1.0m
+                    ? $"Check-in: {task.Title} ({basePoints} × {bonusMultiplier:0.0#}x streak)"
+                    : $"Check-in: {task.Title}",
+                CreatedAt = DateTime.UtcNow
+            };
+            await _pointTransactionRepository.CreateAsync(transaction);
+            await _userRepository.AddPointsAsync(userId, pointsToAward);
+        }
+
+        var newRecurringTotal = alreadyEarned + pointsToAward;
 
         // Advance to next due date and reset to pending
         var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule, clientToday);
@@ -392,15 +401,16 @@ public class TasksController : ControllerBase
 
         var user = await _userRepository.GetByIdAsync(userId);
 
-        _logger.LogInformation("Check-in complete for task {TaskId}: {Points} pts, streak {Count}", id, pointsToAward, updatedStreak?.CurrentCount);
+        _logger.LogInformation("Check-in complete for task {TaskId}: {Base}×{Mult}={Awarded} pts, streak {Count}", id, basePoints, bonusMultiplier, pointsToAward, updatedStreak?.CurrentCount);
         return Ok(new CheckInResponse
         {
             PointsAwarded = pointsToAward,
+            BasePoints = basePoints,
             NewBalance = user?.CurrentBalance ?? 0,
             RecurringDailyTotal = newRecurringTotal,
             StreakCount = updatedStreak?.CurrentCount ?? 1,
             LongestCount = updatedStreak?.LongestCount ?? 1,
-            BonusMultiplier = updatedStreak?.BonusMultiplier ?? 1.0m,
+            BonusMultiplier = bonusMultiplier,
             StreakReset = streakReset,
             NextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty
         });
