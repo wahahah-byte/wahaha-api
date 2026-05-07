@@ -83,7 +83,9 @@ public class MappingProfile : Profile
           .ForMember(dest => dest.Submitted, opt => opt.MapFrom(src => src.Submitted))
           .ForMember(dest => dest.WasPenalized, opt => opt.MapFrom(src => src.WasPenalized))
           .ForMember(dest => dest.Subtasks, opt => opt.MapFrom(src =>
-              src.Subtasks.OrderBy(s => s.SortOrder).ThenBy(s => s.CreatedAt)));
+              src.Subtasks.OrderBy(s => s.SortOrder).ThenBy(s => s.CreatedAt)))
+          .ForMember(dest => dest.RecentCycles, opt => opt.MapFrom(src =>
+              src.CheckInCycles.OrderByDescending(c => c.CheckInDate).ThenByDescending(c => c.CycleId)));
 
         CreateMap<CreateTaskDto, Models.Domain.Task>()
             .ForMember(dest => dest.TaskId, opt => opt.MapFrom(src => Guid.NewGuid()))

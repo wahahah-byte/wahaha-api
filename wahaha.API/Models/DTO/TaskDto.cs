@@ -24,6 +24,7 @@ public class TaskDto
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
     public List<SubtaskDto> Subtasks { get; set; } = new();
+    public List<CheckInCycleDto> RecentCycles { get; set; } = new();
 }
 
 public class CreateTaskDto

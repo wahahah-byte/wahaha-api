@@ -9,6 +9,11 @@ namespace wahaha.API.Repositories;
 
 public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskRepository
 {
+    // Top N most-recent check-in cycles included with each Task so the detail modal
+    // has counter history available on first paint without a follow-up fetch, and
+    // the heatmap strip can render a full 14-day window for daily/weekdays tasks.
+    private const int RecentCyclesPreviewCount = 14;
+
     public TaskRepository(WahahaDbContext context, ILogger<TaskRepository> logger)
         : base(context, logger) { }
 
@@ -16,6 +21,10 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
     {
         return await _dbSet
             .Include(t => t.Subtasks)
+            .Include(t => t.CheckInCycles
+                .OrderByDescending(c => c.CheckInDate)
+                .ThenByDescending(c => c.CycleId)
+                .Take(RecentCyclesPreviewCount))
             .FirstOrDefaultAsync(t => t.TaskId == id);
     }
 
@@ -47,11 +56,20 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
             var uid = filters.UserId.Value;
             query = _dbSet
                 .Include(t => t.Streaks.Where(s => s.UserId == uid && s.IsActive))
-                .Include(t => t.Subtasks);
+                .Include(t => t.Subtasks)
+                .Include(t => t.CheckInCycles
+                    .OrderByDescending(c => c.CheckInDate)
+                    .ThenByDescending(c => c.CycleId)
+                    .Take(RecentCyclesPreviewCount));
         }
         else
         {
-            query = _dbSet.Include(t => t.Subtasks);
+            query = _dbSet
+                .Include(t => t.Subtasks)
+                .Include(t => t.CheckInCycles
+                    .OrderByDescending(c => c.CheckInDate)
+                    .ThenByDescending(c => c.CycleId)
+                    .Take(RecentCyclesPreviewCount));
         }
 
         if (filters.UserId.HasValue)
