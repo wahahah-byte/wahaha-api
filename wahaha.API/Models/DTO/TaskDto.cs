@@ -21,6 +21,8 @@ public class TaskDto
     public int? LongestStreakCount { get; set; }
     public DateTime? LastCheckInDate { get; set; }
     public bool IsArchived { get; set; } = false;
+    public bool HasCounter { get; set; } = false;
+    public string? CounterUnit { get; set; }
     public List<SubtaskDto> Subtasks { get; set; } = new();
 }
 
@@ -37,7 +39,8 @@ public class CreateTaskDto
     public bool IsRecurring { get; set; } = false;
     public string? RecurrenceRule { get; set; }
     public bool Submitted { get; set; } = false;
-
+    public bool HasCounter { get; set; } = false;
+    public string? CounterUnit { get; set; }
 }
 
 public class UpdateTaskDto
@@ -54,4 +57,6 @@ public class UpdateTaskDto
     public bool IsRecurring { get; set; }
     public string? RecurrenceRule { get; set; }
     public bool? Submitted { get; set; }
+    public bool HasCounter { get; set; } = false;
+    public string? CounterUnit { get; set; }
 }

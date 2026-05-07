@@ -124,6 +124,7 @@ builder.Services.AddScoped<IPointTransactionRepository, PointTransactionReposito
 builder.Services.AddScoped<IStreakRepository, StreakRepository>();
 builder.Services.AddScoped<ISubtaskRepository, SubtaskRepository>();
 builder.Services.AddScoped<ITaskRepository, TaskRepository>();
+builder.Services.AddScoped<ITaskCheckInCycleRepository, TaskCheckInCycleRepository>();
 builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();

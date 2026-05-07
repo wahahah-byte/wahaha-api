@@ -64,7 +64,7 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
         };
     }
 
-    public async Task<bool> IncrementAsync(int id)
+    public async Task<bool> IncrementAsync(int id, DateTime? activityDate = null)
     {
         _logger.LogInformation("Incrementing streak {StreakId}", id);
         var streak = await _dbSet.FindAsync(id);
@@ -75,7 +75,7 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
         }
 
         streak.CurrentCount++;
-        streak.LastActivityDate = DateTime.UtcNow;
+        streak.LastActivityDate = activityDate ?? DateTime.UtcNow;
         streak.IsActive = true;
 
         if (streak.CurrentCount > streak.LongestCount)

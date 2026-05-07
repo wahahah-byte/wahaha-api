@@ -73,6 +73,9 @@ public class MappingProfile : Profile
         // Subtask
         CreateMap<Subtask, SubtaskDto>();
 
+        // TaskCheckInCycle
+        CreateMap<TaskCheckInCycle, CheckInCycleDto>();
+
         // Task
         CreateMap<Models.Domain.Task, TaskDto>()
           .ForMember(dest => dest.Priority, opt => opt.MapFrom(src => src.Priority.ToString()))

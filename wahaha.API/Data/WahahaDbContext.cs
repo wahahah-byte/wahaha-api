@@ -16,6 +16,7 @@ public class WahahaDbContext: DbContext
     public DbSet<Streak> Streaks { get; set; }
     public DbSet<Subtask> Subtasks { get; set; }
     public DbSet<Models.Domain.Task> Tasks { get; set; }
+    public DbSet<TaskCheckInCycle> TaskCheckInCycles { get; set; }
     public DbSet<UserInventory> UserInventories { get; set; }
     public DbSet<Users> Users { get; set; }
 
@@ -69,5 +70,14 @@ public class WahahaDbContext: DbContext
 
         modelBuilder.Entity<Subtask>()
             .HasIndex(s => s.TaskId);
+
+        modelBuilder.Entity<TaskCheckInCycle>()
+            .HasOne(c => c.Task)
+            .WithMany(t => t.CheckInCycles)
+            .HasForeignKey(c => c.TaskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TaskCheckInCycle>()
+            .HasIndex(c => new { c.TaskId, c.CheckInDate });
     }
 }

@@ -19,6 +19,7 @@ public class TasksController : ControllerBase
     private readonly IPointTransactionRepository _pointTransactionRepository;
     private readonly IUserRepository _userRepository;
     private readonly IStreakRepository _streakRepository;
+    private readonly ITaskCheckInCycleRepository _checkInCycleRepository;
     private readonly ITaskPenaltyService _penaltyService;
     private readonly IMapper _mapper;
     private readonly ILogger<TasksController> _logger;
@@ -28,6 +29,7 @@ public class TasksController : ControllerBase
         IPointTransactionRepository pointTransactionRepository,
         IUserRepository userRepository,
         IStreakRepository streakRepository,
+        ITaskCheckInCycleRepository checkInCycleRepository,
         ITaskPenaltyService penaltyService,
         IMapper mapper,
         ILogger<TasksController> logger)
@@ -36,6 +38,7 @@ public class TasksController : ControllerBase
         _pointTransactionRepository = pointTransactionRepository;
         _userRepository = userRepository;
         _streakRepository = streakRepository;
+        _checkInCycleRepository = checkInCycleRepository;
         _penaltyService = penaltyService;
         _mapper = mapper;
         _logger = logger;
@@ -277,7 +280,7 @@ public class TasksController : ControllerBase
     }
 
     [HttpPost("{id}/checkin")]
-    public async Task<ActionResult<CheckInResponse>> CheckIn(Guid id)
+    public async Task<ActionResult<CheckInResponse>> CheckIn(Guid id, [FromBody] CheckInRequest? request = null)
     {
         var userId = GetCurrentUserId();
         _logger.LogInformation("User {UserId} checking in recurring task {TaskId}", userId, id);
@@ -292,6 +295,15 @@ public class TasksController : ControllerBase
 
         if (task.Status != ByteTaskStatus.pending)
             return BadRequest($"Task must be pending to check in — current status is {task.Status}.");
+
+        var counterValue = request?.CounterValue;
+        if (counterValue.HasValue)
+        {
+            if (!task.HasCounter)
+                return BadRequest("This task does not track a counter.");
+            if (counterValue.Value < 0)
+                return BadRequest("Counter value must be non-negative.");
+        }
 
         var clientToday = GetClientToday();
 
@@ -338,7 +350,7 @@ public class TasksController : ControllerBase
                 "monthly"  => 31,
                 _          => 1
             };
-            var daysSinceLast = (DateTime.UtcNow - streak.LastActivityDate).TotalDays;
+            var daysSinceLast = (clientToday.Date - streak.LastActivityDate.Date).Days;
             if (daysSinceLast > maxGapDays)
             {
                 await _streakRepository.ResetAsync(streak.StreakId);
@@ -346,7 +358,7 @@ public class TasksController : ControllerBase
             }
         }
 
-        await _streakRepository.IncrementAsync(streak.StreakId);
+        await _streakRepository.IncrementAsync(streak.StreakId, clientToday);
         var updatedStreak = await _streakRepository.GetByIdAsync(streak.StreakId);
         var bonusMultiplier = updatedStreak?.BonusMultiplier ?? 1.0m;
 
@@ -398,6 +410,14 @@ public class TasksController : ControllerBase
         task.Submitted = false;
         task.LastCheckInDate = clientToday;
         await _taskRepository.UpdateAsync(task);
+
+        await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle
+        {
+            TaskId = id,
+            CheckInDate = clientToday,
+            CounterValue = counterValue,
+            CreatedAt = DateTime.UtcNow
+        });
 
         var user = await _userRepository.GetByIdAsync(userId);
 
@@ -480,6 +500,83 @@ public class TasksController : ControllerBase
         if (!success) return BadRequest("Task could not be unarchived.");
 
         _logger.LogInformation("Task {TaskId} unarchived by user {UserId}", id, userId);
+        return NoContent();
+    }
+
+    [HttpGet("{id}/checkin-history")]
+    public async Task<ActionResult<PagedResult<CheckInCycleDto>>> GetCheckInHistory(
+        Guid id,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 30)
+    {
+        var userId = GetCurrentUserId();
+        var task = await _taskRepository.GetByIdAsync(id);
+        if (task == null || task.UserId != userId)
+            return NotFound($"Task with ID {id} was not found.");
+
+        if (pageNumber < 1) pageNumber = 1;
+        if (pageSize < 1) pageSize = 30;
+        if (pageSize > 100) pageSize = 100;
+
+        var (items, total) = await _checkInCycleRepository.GetByTaskIdAsync(id, pageNumber, pageSize);
+        var dtos = _mapper.Map<List<CheckInCycleDto>>(items);
+        return Ok(new PagedResult<CheckInCycleDto>
+        {
+            Data = dtos,
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = total
+        });
+    }
+
+    [HttpPost("{id}/log-counter")]
+    public async Task<ActionResult<CheckInCycleDto>> LogCounter(Guid id, [FromBody] CheckInRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var task = await _taskRepository.GetByIdAsync(id);
+        if (task == null || task.UserId != userId)
+            return NotFound($"Task with ID {id} was not found.");
+
+        if (!task.IsRecurring)
+            return BadRequest("Only recurring tasks can log a counter.");
+        if (!task.HasCounter)
+            return BadRequest("This task does not track a counter.");
+        if (!request.CounterValue.HasValue)
+            return BadRequest("Counter value is required.");
+        if (request.CounterValue.Value < 0)
+            return BadRequest("Counter value must be non-negative.");
+
+        var cycle = await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle
+        {
+            TaskId = id,
+            CheckInDate = GetClientToday(),
+            CounterValue = request.CounterValue.Value,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        return Ok(_mapper.Map<CheckInCycleDto>(cycle));
+    }
+
+    [HttpPatch("{taskId}/checkin-history/{cycleId}")]
+    public async Task<IActionResult> UpdateCheckInCycle(Guid taskId, int cycleId, [FromBody] CheckInRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var task = await _taskRepository.GetByIdAsync(taskId);
+        if (task == null || task.UserId != userId)
+            return NotFound($"Task with ID {taskId} was not found.");
+
+        if (!task.HasCounter)
+            return BadRequest("This task does not track a counter.");
+
+        if (request.CounterValue.HasValue && request.CounterValue.Value < 0)
+            return BadRequest("Counter value must be non-negative.");
+
+        var cycle = await _checkInCycleRepository.GetByIdAsync(cycleId);
+        if (cycle == null || cycle.TaskId != taskId)
+            return NotFound($"Check-in cycle {cycleId} was not found for task {taskId}.");
+
+        cycle.CounterValue = request.CounterValue;
+        await _checkInCycleRepository.UpdateAsync(cycle);
         return NoContent();
     }
 

@@ -69,11 +69,20 @@ public class Task
     [Column("is_archived")]
     public bool IsArchived { get; set; } = false;
 
+    [Required]
+    [Column("has_counter")]
+    public bool HasCounter { get; set; } = false;
+
+    [MaxLength(20)]
+    [Column("counter_unit")]
+    public string? CounterUnit { get; set; }
+
     // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }
     public ICollection<Streak> Streaks { get; set; } = new List<Streak>();
     public ICollection<Subtask> Subtasks { get; set; } = new List<Subtask>();
+    public ICollection<TaskCheckInCycle> CheckInCycles { get; set; } = new List<TaskCheckInCycle>();
 }
 public enum Priority
 {
