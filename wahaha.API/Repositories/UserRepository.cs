@@ -96,4 +96,23 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
         await _context.SaveChangesAsync();
         return true;
     }
+
+    // Reverses an earlier AddPointsAsync — typically when a check-in is undone.
+    // Allowed to drive CurrentBalance negative if the user already spent the
+    // awarded points; we trust the caller to have validated authorization.
+    public async Task<bool> RefundPointsAsync(Guid id, int points)
+    {
+        _logger.LogInformation("Refunding {Points} points from user {UserId}", points, id);
+        var user = await _dbSet.FindAsync(id);
+        if (user == null)
+        {
+            _logger.LogWarning("User {UserId} not found when refunding points", id);
+            return false;
+        }
+
+        user.CurrentBalance -= points;
+        user.TotalPointsEarned -= points;
+        await _context.SaveChangesAsync();
+        return true;
+    }
 }

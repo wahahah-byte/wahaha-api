@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wahaha.API.Data;
 
@@ -11,9 +12,11 @@ using wahaha.API.Data;
 namespace wahaha.API.Migrations
 {
     [DbContext(typeof(WahahaDbContext))]
-    partial class WahahaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260508234050_AddTaskCounterGoal")]
+    partial class AddTaskCounterGoal
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -772,18 +775,6 @@ namespace wahaha.API.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
-
-                    b.Property<int?>("RepsTarget")
-                        .HasColumnType("int")
-                        .HasColumnName("reps_target");
-
-                    b.Property<int?>("SetsCompleted")
-                        .HasColumnType("int")
-                        .HasColumnName("sets_completed");
-
-                    b.Property<int?>("SetsTarget")
-                        .HasColumnType("int")
-                        .HasColumnName("sets_target");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int")

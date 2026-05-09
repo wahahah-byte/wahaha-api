@@ -11,4 +11,5 @@ public interface IUserRepository : IRepository<Users, Guid>
     Task<Users?> GetByUsernameAsync(string username);
     Task<bool> AddPointsAsync(Guid id, int points);
     Task<bool> SpendPointsAsync(Guid id, int points);
+    Task<bool> RefundPointsAsync(Guid id, int points);
 }

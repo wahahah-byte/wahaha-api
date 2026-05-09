@@ -77,6 +77,9 @@ public class Task
     [Column("counter_unit")]
     public string? CounterUnit { get; set; }
 
+    [Column("counter_goal")]
+    public int? CounterGoal { get; set; }
+
     // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }

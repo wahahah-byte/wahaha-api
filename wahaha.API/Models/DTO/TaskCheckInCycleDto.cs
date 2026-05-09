@@ -7,9 +7,24 @@ public class CheckInCycleDto
     public DateTime CheckInDate { get; set; }
     public int? CounterValue { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string CycleType { get; set; } = "checkin";
 }
 
 public class CheckInRequest
 {
     public int? CounterValue { get; set; }
+}
+
+public class UndoCheckInResponse
+{
+    public int NewBalance { get; set; }
+    public int RecurringDailyTotal { get; set; }
+    public int StreakCount { get; set; }
+    public int LongestCount { get; set; }
+    public decimal BonusMultiplier { get; set; }
+    public string PreviousDueDate { get; set; } = string.Empty;
+    // Empty string means "no prior check-in" (null in DB) — the client treats
+    // it as null so the task counts as never-checked-in and unlocks immediately.
+    public string PreviousLastCheckInDate { get; set; } = string.Empty;
+    public int PointsRefunded { get; set; }
 }

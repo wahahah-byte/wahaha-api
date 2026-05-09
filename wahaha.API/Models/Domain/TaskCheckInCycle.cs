@@ -25,6 +25,42 @@ public class TaskCheckInCycle
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // "checkin" = full check-in (advances cycle, awards points, increments streak).
+    // "log"     = counter-only entry (no side effects).
+    [Required]
+    [MaxLength(16)]
+    [Column("cycle_type")]
+    public string CycleType { get; set; } = "checkin";
+
+    // Rollback snapshot — populated only when CycleType == "checkin" so undo can
+    // restore the task/streak/balance to their pre-check-in state.
+    [Column("points_awarded")]
+    public int? PointsAwarded { get; set; }
+
+    [Column("point_transaction_id")]
+    public int? PointTransactionId { get; set; }
+
+    [Column("previous_due_date")]
+    public DateTime? PreviousDueDate { get; set; }
+
+    [Column("previous_last_check_in_date")]
+    public DateTime? PreviousLastCheckInDate { get; set; }
+
+    [Column("previous_streak_count")]
+    public int? PreviousStreakCount { get; set; }
+
+    [Column("previous_longest_count")]
+    public int? PreviousLongestCount { get; set; }
+
+    [Column("previous_streak_last_activity")]
+    public DateTime? PreviousStreakLastActivity { get; set; }
+
+    [Column("previous_streak_is_active")]
+    public bool? PreviousStreakIsActive { get; set; }
+
+    [Column("previous_streak_bonus_multiplier", TypeName = "decimal(18,4)")]
+    public decimal? PreviousStreakBonusMultiplier { get; set; }
+
     [ForeignKey("TaskId")]
     public Task? Task { get; set; }
 }

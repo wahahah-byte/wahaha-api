@@ -358,6 +358,13 @@ public class TasksController : ControllerBase
             }
         }
 
+        // Snapshot streak state BEFORE increment so undo can restore it.
+        var prevStreakCount = streak.CurrentCount;
+        var prevLongestCount = streak.LongestCount;
+        var prevStreakLastActivity = streak.LastActivityDate;
+        var prevStreakIsActive = streak.IsActive;
+        var prevStreakBonusMultiplier = streak.BonusMultiplier;
+
         await _streakRepository.IncrementAsync(streak.StreakId, clientToday);
         var updatedStreak = await _streakRepository.GetByIdAsync(streak.StreakId);
         var bonusMultiplier = updatedStreak?.BonusMultiplier ?? 1.0m;
@@ -382,6 +389,7 @@ public class TasksController : ControllerBase
         var multipliedPoints = (int)Math.Round(basePoints * (double)bonusMultiplier, MidpointRounding.AwayFromZero);
         var pointsToAward = Math.Max(0, Math.Min(multipliedPoints, Math.Min(sourceRemaining, categoryRemaining)));
 
+        int? pointTransactionId = null;
         if (pointsToAward > 0)
         {
             var transaction = new PointTransaction
@@ -397,10 +405,15 @@ public class TasksController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             };
             await _pointTransactionRepository.CreateAsync(transaction);
+            pointTransactionId = transaction.TransactionId;
             await _userRepository.AddPointsAsync(userId, pointsToAward);
         }
 
         var newRecurringTotal = alreadyEarned + pointsToAward;
+
+        // Snapshot task state BEFORE advance so undo can restore it.
+        var prevDueDate = task.DueDate;
+        var prevLastCheckInDate = task.LastCheckInDate;
 
         // Advance to next due date and reset to pending
         var nextDue = ComputeNextDueDate(task.DueDate, task.RecurrenceRule, clientToday);
@@ -411,12 +424,22 @@ public class TasksController : ControllerBase
         task.LastCheckInDate = clientToday;
         await _taskRepository.UpdateAsync(task);
 
-        await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle
+        var newCycle = await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle
         {
             TaskId = id,
             CheckInDate = clientToday,
             CounterValue = counterValue,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            CycleType = "checkin",
+            PointsAwarded = pointsToAward,
+            PointTransactionId = pointTransactionId,
+            PreviousDueDate = prevDueDate,
+            PreviousLastCheckInDate = prevLastCheckInDate,
+            PreviousStreakCount = prevStreakCount,
+            PreviousLongestCount = prevLongestCount,
+            PreviousStreakLastActivity = prevStreakLastActivity,
+            PreviousStreakIsActive = prevStreakIsActive,
+            PreviousStreakBonusMultiplier = prevStreakBonusMultiplier,
         });
 
         var user = await _userRepository.GetByIdAsync(userId);
@@ -432,7 +455,8 @@ public class TasksController : ControllerBase
             LongestCount = updatedStreak?.LongestCount ?? 1,
             BonusMultiplier = bonusMultiplier,
             StreakReset = streakReset,
-            NextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty
+            NextDueDate = nextDue?.ToString("yyyy-MM-dd") ?? string.Empty,
+            CycleId = newCycle.CycleId,
         });
     }
 
@@ -543,15 +567,17 @@ public class TasksController : ControllerBase
             return BadRequest("This task does not track a counter.");
         if (!request.CounterValue.HasValue)
             return BadRequest("Counter value is required.");
-        if (request.CounterValue.Value < 0)
-            return BadRequest("Counter value must be non-negative.");
+        // Log entries are deltas — they can be negative so quick-log "−"
+        // buttons can subtract from today's running total. Sums are computed
+        // client-side, and the UI prevents driving the day-total below zero.
 
         var cycle = await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle
         {
             TaskId = id,
             CheckInDate = GetClientToday(),
             CounterValue = request.CounterValue.Value,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            CycleType = "log",
         });
 
         return Ok(_mapper.Map<CheckInCycleDto>(cycle));
@@ -577,6 +603,106 @@ public class TasksController : ControllerBase
 
         cycle.CounterValue = request.CounterValue;
         await _checkInCycleRepository.UpdateAsync(cycle);
+        return NoContent();
+    }
+
+    // Undo a check-in cycle: reverses the points/streak/dueDate/lastCheckInDate
+    // changes made by the original CheckIn. Only allowed for the latest cycle of
+    // type "checkin" whose CheckInDate equals client-today.
+    [HttpPost("{taskId}/checkin/{cycleId}/undo")]
+    public async Task<ActionResult<UndoCheckInResponse>> UndoCheckIn(Guid taskId, int cycleId)
+    {
+        var userId = GetCurrentUserId();
+        _logger.LogInformation("User {UserId} undoing check-in cycle {CycleId} on task {TaskId}", userId, cycleId, taskId);
+
+        var task = await _taskRepository.GetByIdAsync(taskId);
+        if (task == null || task.UserId != userId)
+            return NotFound($"Task with ID {taskId} was not found.");
+
+        var cycle = await _checkInCycleRepository.GetByIdAsync(cycleId);
+        if (cycle == null || cycle.TaskId != taskId)
+            return NotFound($"Check-in cycle {cycleId} was not found for task {taskId}.");
+
+        if (cycle.CycleType != "checkin")
+            return BadRequest("This cycle is not a check-in and cannot be undone via this endpoint.");
+
+        var latest = await _checkInCycleRepository.GetLatestByTaskIdAsync(taskId);
+        if (latest == null || latest.CycleId != cycle.CycleId)
+            return BadRequest("Only the most recent check-in can be undone.");
+
+        var clientToday = GetClientToday();
+        if (cycle.CheckInDate.Date != clientToday.Date)
+            return BadRequest("Check-ins can only be undone on the same day they were made.");
+
+        // Reverse the awarded points (delete the transaction, refund balance).
+        var pointsRefunded = cycle.PointsAwarded ?? 0;
+        if (cycle.PointTransactionId.HasValue)
+        {
+            await _pointTransactionRepository.DeleteAsync(cycle.PointTransactionId.Value);
+        }
+        if (pointsRefunded > 0)
+        {
+            await _userRepository.RefundPointsAsync(userId, pointsRefunded);
+        }
+
+        // Restore streak from snapshot.
+        var streak = await _streakRepository.GetByTaskIdAsync(taskId);
+        if (streak != null)
+        {
+            streak.CurrentCount = cycle.PreviousStreakCount ?? 0;
+            streak.LongestCount = cycle.PreviousLongestCount ?? streak.LongestCount;
+            streak.LastActivityDate = cycle.PreviousStreakLastActivity ?? streak.LastActivityDate;
+            streak.IsActive = cycle.PreviousStreakIsActive ?? streak.IsActive;
+            streak.BonusMultiplier = cycle.PreviousStreakBonusMultiplier ?? streak.BonusMultiplier;
+            await _streakRepository.UpdateAsync(streak);
+        }
+
+        // Restore task fields from snapshot.
+        task.DueDate = cycle.PreviousDueDate;
+        task.LastCheckInDate = cycle.PreviousLastCheckInDate;
+        await _taskRepository.UpdateAsync(task);
+
+        // Delete the cycle row last so all rollback fields stay readable above.
+        await _checkInCycleRepository.DeleteAsync(cycle.CycleId);
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        var newRecurringTotal = await _pointTransactionRepository.GetDailyEarnedBySourceTypeAsync(userId, DateTime.UtcNow, SourceType.recurring_task);
+
+        _logger.LogInformation("Check-in cycle {CycleId} undone: refunded {Points} pts, streak restored to {Count}", cycleId, pointsRefunded, streak?.CurrentCount);
+
+        return Ok(new UndoCheckInResponse
+        {
+            NewBalance = user?.CurrentBalance ?? 0,
+            RecurringDailyTotal = newRecurringTotal,
+            StreakCount = streak?.CurrentCount ?? 0,
+            LongestCount = streak?.LongestCount ?? 0,
+            BonusMultiplier = streak?.BonusMultiplier ?? 1.0m,
+            PreviousDueDate = cycle.PreviousDueDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            PreviousLastCheckInDate = cycle.PreviousLastCheckInDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            PointsRefunded = pointsRefunded,
+        });
+    }
+
+    // Delete a "log"-type cycle (no point/streak/dueDate side effects). Logs
+    // are pure data points so any owned row can be removed at any time —
+    // unlike "checkin" cycles, which must go through /undo and only on the
+    // same day so streaks/points stay coherent.
+    [HttpDelete("{taskId}/checkin-history/{cycleId}")]
+    public async Task<IActionResult> DeleteLogCycle(Guid taskId, int cycleId)
+    {
+        var userId = GetCurrentUserId();
+        var task = await _taskRepository.GetByIdAsync(taskId);
+        if (task == null || task.UserId != userId)
+            return NotFound($"Task with ID {taskId} was not found.");
+
+        var cycle = await _checkInCycleRepository.GetByIdAsync(cycleId);
+        if (cycle == null || cycle.TaskId != taskId)
+            return NotFound($"Check-in cycle {cycleId} was not found for task {taskId}.");
+
+        if (cycle.CycleType != "log")
+            return BadRequest("This cycle is a check-in and must be reversed via /undo.");
+
+        await _checkInCycleRepository.DeleteAsync(cycle.CycleId);
         return NoContent();
     }
 

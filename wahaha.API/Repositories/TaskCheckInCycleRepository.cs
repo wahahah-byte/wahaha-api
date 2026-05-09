@@ -22,4 +22,13 @@ public class TaskCheckInCycleRepository : Repository<TaskCheckInCycle, int>, ITa
             .ToListAsync();
         return (items, total);
     }
+
+    public async Task<TaskCheckInCycle?> GetLatestByTaskIdAsync(Guid taskId)
+    {
+        return await _dbSet
+            .Where(c => c.TaskId == taskId)
+            .OrderByDescending(c => c.CheckInDate)
+            .ThenByDescending(c => c.CycleId)
+            .FirstOrDefaultAsync();
+    }
 }

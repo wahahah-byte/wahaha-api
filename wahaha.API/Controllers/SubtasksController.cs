@@ -76,7 +76,10 @@ public class SubtasksController : ControllerBase
             Title = request.Title.Trim(),
             Completed = false,
             SortOrder = sortOrder,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            SetsTarget = request.SetsTarget,
+            RepsTarget = request.RepsTarget,
+            SetsCompleted = request.SetsTarget.HasValue ? 0 : (int?)null,
         };
         var created = await _subtaskRepository.CreateAsync(subtask);
         _logger.LogInformation("Created subtask {SubtaskId} on task {TaskId}", created.SubtaskId, taskId);
@@ -97,6 +100,9 @@ public class SubtasksController : ControllerBase
         }
         if (request.Completed.HasValue) subtask.Completed = request.Completed.Value;
         if (request.SortOrder.HasValue) subtask.SortOrder = request.SortOrder.Value;
+        if (request.SetsTarget.HasValue) subtask.SetsTarget = request.SetsTarget.Value;
+        if (request.RepsTarget.HasValue) subtask.RepsTarget = request.RepsTarget.Value;
+        if (request.SetsCompleted.HasValue) subtask.SetsCompleted = request.SetsCompleted.Value;
 
         await _subtaskRepository.UpdateAsync(subtask);
         return Ok(_mapper.Map<SubtaskDto>(subtask));

@@ -23,6 +23,7 @@ public class TaskDto
     public bool IsArchived { get; set; } = false;
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
+    public int? CounterGoal { get; set; }
     public List<SubtaskDto> Subtasks { get; set; } = new();
     public List<CheckInCycleDto> RecentCycles { get; set; } = new();
 }
@@ -42,6 +43,7 @@ public class CreateTaskDto
     public bool Submitted { get; set; } = false;
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
+    public int? CounterGoal { get; set; }
 }
 
 public class UpdateTaskDto
@@ -60,4 +62,5 @@ public class UpdateTaskDto
     public bool? Submitted { get; set; }
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
+    public int? CounterGoal { get; set; }
 }

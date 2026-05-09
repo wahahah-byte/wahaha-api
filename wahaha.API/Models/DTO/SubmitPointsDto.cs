@@ -11,6 +11,7 @@ public class CheckInResponse
     public decimal BonusMultiplier { get; set; }
     public bool StreakReset { get; set; }
     public string NextDueDate { get; set; } = string.Empty;
+    public int CycleId { get; set; }
 }
 
 public class SubmitPointsRequest
