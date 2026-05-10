@@ -16,6 +16,7 @@ namespace wahaha.API.Controllers;
 public class AvatarItemsController : ControllerBase
 {
     private readonly IAvatarItemRepository _avatarItemRepository;
+    private readonly IUserInventoryRepository _inventoryRepository;
     private readonly IBlobService _blobService;
     private readonly IMapper _mapper;
     private readonly ILogger<AvatarItemsController> _logger;
@@ -23,14 +24,22 @@ public class AvatarItemsController : ControllerBase
 
     public AvatarItemsController(
         IAvatarItemRepository avatarItemRepository,
+        IUserInventoryRepository inventoryRepository,
         IBlobService blobService,
         IMapper mapper,
         ILogger<AvatarItemsController> logger)
     {
         _avatarItemRepository = avatarItemRepository;
+        _inventoryRepository = inventoryRepository;
         _blobService = blobService;
         _mapper = mapper;
         _logger = logger;
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var claim = User.FindFirst("appUserId")?.Value;
+        return Guid.TryParse(claim, out var userId) ? userId : Guid.Empty;
     }
 
     [AllowAnonymous]
@@ -105,6 +114,56 @@ public class AvatarItemsController : ControllerBase
 
         var created = await _avatarItemRepository.CreateAsync(item);
         _logger.LogInformation("Avatar item {ItemId} ({Name}) created successfully", created.ItemId, created.Name);
+
+        return CreatedAtAction(nameof(GetById), new { id = created.ItemId }, _mapper.Map<AvatarItemDto>(created));
+    }
+
+    // Admin escape-hatch for assets that were hand-uploaded to blob storage —
+    // skips the multipart upload path, stores the supplied URL on a new
+    // AvatarItem row, and (optionally) drops the item into the calling user's
+    // inventory and equips it. Useful for seeding an existing blob into the
+    // catalogue without going through the file-upload flow.
+    [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
+    [HttpPost("register-by-url")]
+    public async Task<ActionResult<AvatarItemDto>> RegisterByUrl([FromBody] RegisterAvatarItemByUrlDto dto)
+    {
+        if (!Enum.TryParse<ItemSlot>(dto.Slot, true, out var slot))
+            return BadRequest($"Invalid slot. Valid: {string.Join(", ", Enum.GetNames<ItemSlot>())}");
+        if (!Enum.TryParse<Rarity>(dto.Rarity, true, out var rarity))
+            return BadRequest($"Invalid rarity. Valid: {string.Join(", ", Enum.GetNames<Rarity>())}");
+
+        _logger.LogInformation("Registering avatar item {Name} from URL {Url}", dto.Name, dto.PreviewAssetUrl);
+
+        var item = new AvatarItem
+        {
+            Name = dto.Name,
+            Category = dto.Category,
+            Slot = slot,
+            Rarity = rarity,
+            Cost = dto.Cost,
+            Description = dto.Description,
+            PreviewAssetUrl = dto.PreviewAssetUrl,
+            IsAvailable = dto.IsAvailable,
+        };
+        var created = await _avatarItemRepository.CreateAsync(item);
+
+        if (dto.GrantAndEquipForCurrentUser)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == Guid.Empty)
+                return BadRequest("No authenticated user — cannot grant.");
+
+            var inv = await _inventoryRepository.CreateAsync(new UserInventory
+            {
+                UserId = userId,
+                ItemId = created.ItemId,
+                IsEquipped = false,        // EquipAsync will flip + handle slot uniqueness
+                AcquiredAt = DateTime.UtcNow,
+            });
+            await _inventoryRepository.EquipAsync(inv.InventoryId);
+            _logger.LogInformation("Granted item {ItemId} to user {UserId} (inventory {InventoryId}) and equipped",
+                created.ItemId, userId, inv.InventoryId);
+        }
 
         return CreatedAtAction(nameof(GetById), new { id = created.ItemId }, _mapper.Map<AvatarItemDto>(created));
     }
