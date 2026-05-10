@@ -12,6 +12,7 @@ public class UserDto
     public DateTime CreatedAt { get; set; }
     public int PointsSubmittedToday { get; set; }
     public int RecurringPointsSubmittedToday { get; set; }
+    public string? ProfilePictureUrl { get; set; }
     public List<PointTransactionDto> PointTransactions { get; set; } = new();
 }
 

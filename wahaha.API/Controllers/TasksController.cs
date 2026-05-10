@@ -568,13 +568,23 @@ public class TasksController : ControllerBase
         if (!request.CounterValue.HasValue)
             return BadRequest("Counter value is required.");
         // Log entries are deltas — they can be negative so quick-log "−"
-        // buttons can subtract from today's running total. Sums are computed
-        // client-side, and the UI prevents driving the day-total below zero.
+        // buttons can subtract from today's running total. The frontend
+        // clamps to keep the displayed total non-negative, but a server-side
+        // guard backs that up: refuse a delta that would drive today's
+        // committed sum below zero. Without this, a stale or non-clamped
+        // client could persist a negative running total.
+        var clientToday = GetClientToday();
+        if (request.CounterValue.Value < 0)
+        {
+            var dayTotal = await _checkInCycleRepository.GetDailyCounterSumAsync(id, clientToday);
+            if (dayTotal + request.CounterValue.Value < 0)
+                return BadRequest("Counter total for the day cannot go below zero.");
+        }
 
         var cycle = await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle
         {
             TaskId = id,
-            CheckInDate = GetClientToday(),
+            CheckInDate = clientToday,
             CounterValue = request.CounterValue.Value,
             CreatedAt = DateTime.UtcNow,
             CycleType = "log",
