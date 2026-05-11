@@ -20,6 +20,7 @@ public class TasksController : ControllerBase
     private readonly IUserRepository _userRepository;
     private readonly IStreakRepository _streakRepository;
     private readonly ITaskCheckInCycleRepository _checkInCycleRepository;
+    private readonly ISubtaskRepository _subtaskRepository;
     private readonly ITaskPenaltyService _penaltyService;
     private readonly IMapper _mapper;
     private readonly ILogger<TasksController> _logger;
@@ -30,6 +31,7 @@ public class TasksController : ControllerBase
         IUserRepository userRepository,
         IStreakRepository streakRepository,
         ITaskCheckInCycleRepository checkInCycleRepository,
+        ISubtaskRepository subtaskRepository,
         ITaskPenaltyService penaltyService,
         IMapper mapper,
         ILogger<TasksController> logger)
@@ -39,6 +41,7 @@ public class TasksController : ControllerBase
         _userRepository = userRepository;
         _streakRepository = streakRepository;
         _checkInCycleRepository = checkInCycleRepository;
+        _subtaskRepository = subtaskRepository;
         _penaltyService = penaltyService;
         _mapper = mapper;
         _logger = logger;
@@ -442,6 +445,15 @@ public class TasksController : ControllerBase
             PreviousStreakBonusMultiplier = prevStreakBonusMultiplier,
         });
 
+        // Clear per-cycle subtask progress so the next cycle starts fresh
+        // (fitness exercises uncheck, set counters zero out). Pre-reset state
+        // is not snapshotted — undoing a check-in will restore points, streak,
+        // and dueDate but won't restore subtask completion.
+        if (task.IsRecurring)
+        {
+            await _subtaskRepository.ResetCompletionByTaskIdAsync(id);
+        }
+
         var user = await _userRepository.GetByIdAsync(userId);
 
         _logger.LogInformation("Check-in complete for task {TaskId}: {Base}×{Mult}={Awarded} pts, streak {Count}", id, basePoints, bonusMultiplier, pointsToAward, updatedStreak?.CurrentCount);
@@ -567,6 +579,15 @@ public class TasksController : ControllerBase
             return BadRequest("This task does not track a counter.");
         if (!request.CounterValue.HasValue)
             return BadRequest("Counter value is required.");
+        // Once today's check-in is committed the cycle is closed; further
+        // logs would append to a finalised cycle's totals. Mirrors the
+        // idempotency clause in CheckIn.
+        if (task.LastCheckInDate.HasValue && task.DueDate.HasValue)
+        {
+            var cycleStart = GetCycleStart(task.DueDate.Value.Date, task.RecurrenceRule);
+            if (task.LastCheckInDate.Value.Date > cycleStart)
+                return BadRequest("Already checked in for this cycle — logs are closed.");
+        }
         // Log entries are deltas — they can be negative so quick-log "−"
         // buttons can subtract from today's running total. The frontend
         // clamps to keep the displayed total non-negative, but a server-side
@@ -579,6 +600,15 @@ public class TasksController : ControllerBase
             var dayTotal = await _checkInCycleRepository.GetDailyCounterSumAsync(id, clientToday);
             if (dayTotal + request.CounterValue.Value < 0)
                 return BadRequest("Counter total for the day cannot go below zero.");
+        }
+        // Cap mode: if the task opted in, refuse a positive delta that would
+        // push today's sum past the configured goal. The visible "goal" then
+        // acts as a hard ceiling instead of an aspirational target.
+        else if (task.CapLogAtGoal && task.CounterGoal.HasValue && request.CounterValue.Value > 0)
+        {
+            var dayTotal = await _checkInCycleRepository.GetDailyCounterSumAsync(id, clientToday);
+            if (dayTotal + request.CounterValue.Value > task.CounterGoal.Value)
+                return BadRequest($"Counter is capped at the goal of {task.CounterGoal.Value}.");
         }
 
         var cycle = await _checkInCycleRepository.CreateAsync(new TaskCheckInCycle

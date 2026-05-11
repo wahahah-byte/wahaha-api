@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wahaha.API.Data;
 
@@ -11,9 +12,11 @@ using wahaha.API.Data;
 namespace wahaha.API.Migrations
 {
     [DbContext(typeof(WahahaDbContext))]
-    partial class WahahaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260510202328_AddTaskStartDate")]
+    partial class AddTaskStartDate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -813,10 +816,6 @@ namespace wahaha.API.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("task_id");
 
-                    b.Property<bool>("CapLogAtGoal")
-                        .HasColumnType("bit")
-                        .HasColumnName("cap_log_at_goal");
-
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -916,7 +915,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000001-0000-0000-0000-000000000001"),
-                            CapLogAtGoal = false,
                             Category = "Learning",
                             CompletedAt = new DateTime(2026, 1, 25, 12, 0, 0, 0, DateTimeKind.Utc),
                             CreatedAt = new DateTime(2026, 1, 25, 0, 0, 0, 0, DateTimeKind.Utc),
@@ -935,7 +933,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000001-0000-0000-0000-000000000002"),
-                            CapLogAtGoal = false,
                             Category = "Gaming",
                             CreatedAt = new DateTime(2026, 2, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             HasCounter = false,
@@ -952,7 +949,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000002-0000-0000-0000-000000000001"),
-                            CapLogAtGoal = false,
                             Category = "Progression",
                             CreatedAt = new DateTime(2026, 2, 5, 0, 0, 0, 0, DateTimeKind.Utc),
                             HasCounter = false,
@@ -969,7 +965,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000002-0000-0000-0000-000000000002"),
-                            CapLogAtGoal = false,
                             Category = "Collection",
                             CompletedAt = new DateTime(2026, 1, 20, 0, 0, 0, 0, DateTimeKind.Utc),
                             CreatedAt = new DateTime(2026, 1, 15, 0, 0, 0, 0, DateTimeKind.Utc),
@@ -987,7 +982,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000003-0000-0000-0000-000000000001"),
-                            CapLogAtGoal = false,
                             Category = "Productivity",
                             CreatedAt = new DateTime(2026, 2, 3, 0, 0, 0, 0, DateTimeKind.Utc),
                             HasCounter = false,
@@ -1004,7 +998,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000004-0000-0000-0000-000000000001"),
-                            CapLogAtGoal = false,
                             Category = "Gaming",
                             CreatedAt = new DateTime(2026, 2, 16, 0, 0, 0, 0, DateTimeKind.Utc),
                             HasCounter = false,
@@ -1021,7 +1014,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000005-0000-0000-0000-000000000001"),
-                            CapLogAtGoal = false,
                             Category = "Onboarding",
                             CompletedAt = new DateTime(2026, 3, 1, 2, 0, 0, 0, DateTimeKind.Utc),
                             CreatedAt = new DateTime(2026, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
@@ -1039,7 +1031,6 @@ namespace wahaha.API.Migrations
                         new
                         {
                             TaskId = new Guid("b0000006-0000-0000-0000-000000000001"),
-                            CapLogAtGoal = false,
                             Category = "Onboarding",
                             CreatedAt = new DateTime(2026, 3, 24, 0, 0, 0, 0, DateTimeKind.Utc),
                             HasCounter = false,

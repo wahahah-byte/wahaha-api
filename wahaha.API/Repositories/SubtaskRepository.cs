@@ -37,4 +37,26 @@ public class SubtaskRepository : Repository<Subtask, int>, ISubtaskRepository
             .MaxAsync();
         return (max ?? -1) + 1;
     }
+
+    public async Task<int> ResetCompletionByTaskIdAsync(Guid taskId)
+    {
+        var subtasks = await _dbSet.Where(s => s.TaskId == taskId).ToListAsync();
+        if (subtasks.Count == 0) return 0;
+        var changed = 0;
+        foreach (var s in subtasks)
+        {
+            if (s.Completed || s.SetsCompleted != null)
+            {
+                s.Completed = false;
+                s.SetsCompleted = null;
+                changed++;
+            }
+        }
+        if (changed > 0)
+        {
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Reset completion on {Count} subtask(s) for task {TaskId}", changed, taskId);
+        }
+        return changed;
+    }
 }

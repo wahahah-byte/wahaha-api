@@ -42,6 +42,9 @@ public class Task
     [Column("due_date")]
     public DateTime? DueDate { get; set; }
 
+    [Column("start_date")]
+    public DateTime? StartDate { get; set; }
+
     [Required]
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -79,6 +82,10 @@ public class Task
 
     [Column("counter_goal")]
     public int? CounterGoal { get; set; }
+
+    [Required]
+    [Column("cap_log_at_goal")]
+    public bool CapLogAtGoal { get; set; } = false;
 
     // Navigation properties
     [ForeignKey("UserId")]

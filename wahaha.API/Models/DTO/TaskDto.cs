@@ -11,6 +11,7 @@ public class TaskDto
     public string Status { get; set; } = string.Empty;
     public int PointValue { get; set; }
     public DateTime? DueDate { get; set; }
+    public DateTime? StartDate { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public bool IsRecurring { get; set; }
@@ -24,6 +25,7 @@ public class TaskDto
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
     public int? CounterGoal { get; set; }
+    public bool CapLogAtGoal { get; set; } = false;
     public List<SubtaskDto> Subtasks { get; set; } = new();
     public List<CheckInCycleDto> RecentCycles { get; set; } = new();
 }
@@ -38,12 +40,14 @@ public class CreateTaskDto
     public string Status { get; set; } = "pending";
     public int PointValue { get; set; } = 10;
     public DateTime? DueDate { get; set; }
+    public DateTime? StartDate { get; set; }
     public bool IsRecurring { get; set; } = false;
     public string? RecurrenceRule { get; set; }
     public bool Submitted { get; set; } = false;
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
     public int? CounterGoal { get; set; }
+    public bool CapLogAtGoal { get; set; } = false;
 }
 
 public class UpdateTaskDto
@@ -56,6 +60,7 @@ public class UpdateTaskDto
     public string Status { get; set; } = string.Empty;
     public int PointValue { get; set; }
     public DateTime? DueDate { get; set; }
+    public DateTime? StartDate { get; set; }
     public DateTime? CompletedAt { get; set; }
     public bool IsRecurring { get; set; }
     public string? RecurrenceRule { get; set; }
@@ -63,4 +68,5 @@ public class UpdateTaskDto
     public bool HasCounter { get; set; } = false;
     public string? CounterUnit { get; set; }
     public int? CounterGoal { get; set; }
+    public bool CapLogAtGoal { get; set; } = false;
 }
