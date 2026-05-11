@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wahaha.API.Data;
 
@@ -11,9 +12,11 @@ using wahaha.API.Data;
 namespace wahaha.API.Migrations
 {
     [DbContext(typeof(WahahaDbContext))]
-    partial class WahahaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260511220000_SeedPngAvatarItems")]
+    partial class SeedPngAvatarItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -45,14 +48,6 @@ namespace wahaha.API.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("description");
-
-                    b.Property<int?>("GridCols")
-                        .HasColumnType("int")
-                        .HasColumnName("grid_cols");
-
-                    b.Property<int?>("GridRows")
-                        .HasColumnType("int")
-                        .HasColumnName("grid_rows");
 
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit")
@@ -1153,14 +1148,6 @@ namespace wahaha.API.Migrations
                     b.Property<int>("ItemId")
                         .HasColumnType("int")
                         .HasColumnName("item_id");
-
-                    b.Property<int?>("PositionX")
-                        .HasColumnType("int")
-                        .HasColumnName("position_x");
-
-                    b.Property<int?>("PositionY")
-                        .HasColumnType("int")
-                        .HasColumnName("position_y");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier")

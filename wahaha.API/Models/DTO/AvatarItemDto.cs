@@ -13,6 +13,10 @@ public class AvatarItemDto
     public string? Description { get; set; }
     public string? PreviewAssetUrl { get; set; }
     public bool IsAvailable { get; set; }
+
+    // Inventory footprint (in grid cells). Null falls back to 1x1 on the client.
+    public int? GridCols { get; set; }
+    public int? GridRows { get; set; }
 }
 
 public class CreateAvatarItemDto

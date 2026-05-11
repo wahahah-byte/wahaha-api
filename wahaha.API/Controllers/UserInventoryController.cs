@@ -111,6 +111,24 @@ public class UserInventoryController : ControllerBase
         return NoContent();
     }
 
+    [HttpPatch("{id}/position")]
+    public async Task<IActionResult> SetPosition(int id, [FromBody] UpdateInventoryPositionDto dto)
+    {
+        _logger.LogInformation("Setting position for inventory item {InventoryId} to ({X}, {Y})", id, dto.PositionX, dto.PositionY);
+        var entry = await _inventoryRepository.GetByIdAsync(id);
+
+        if (entry == null || entry.UserId != GetCurrentUserId())
+        {
+            _logger.LogWarning("Inventory entry {InventoryId} not found or unauthorized for position update", id);
+            return NotFound($"Inventory entry with ID {id} was not found.");
+        }
+
+        entry.PositionX = dto.PositionX;
+        entry.PositionY = dto.PositionY;
+        await _inventoryRepository.UpdateAsync(entry);
+        return NoContent();
+    }
+
     [HttpPatch("{id}/unequip")]
     public async Task<IActionResult> Unequip(int id)
     {

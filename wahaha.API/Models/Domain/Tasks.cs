@@ -42,9 +42,6 @@ public class Task
     [Column("due_date")]
     public DateTime? DueDate { get; set; }
 
-    [Column("start_date")]
-    public DateTime? StartDate { get; set; }
-
     [Required]
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

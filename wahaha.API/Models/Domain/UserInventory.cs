@@ -25,6 +25,15 @@ public class UserInventory
     [Column("is_equipped")]
     public bool IsEquipped { get; set; } = false;
 
+    // Position in the user's personal grid (Resident-Evil-style placement).
+    // Nullable so existing rows can be auto-placed on first read; the
+    // frontend persists assigned positions back via PATCH /position.
+    [Column("position_x")]
+    public int? PositionX { get; set; }
+
+    [Column("position_y")]
+    public int? PositionY { get; set; }
+
     // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }

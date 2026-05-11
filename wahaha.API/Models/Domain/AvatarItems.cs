@@ -44,6 +44,15 @@ public class AvatarItem
     [Column("is_available")]
     public bool IsAvailable { get; set; } = true;
 
+    // RE-style inventory footprint. Nullable so old rows can fall back to the
+    // client-side default of 1x1. The avatar page uses these to render each
+    // item across (GridCols × GridRows) cells of the user's inventory grid.
+    [Column("grid_cols")]
+    public int? GridCols { get; set; }
+
+    [Column("grid_rows")]
+    public int? GridRows { get; set; }
+
     // Navigation property
     public ICollection<UserInventory> UserInventories { get; set; } = new List<UserInventory>();
 }
@@ -51,6 +60,7 @@ public class AvatarItem
 public enum ItemSlot
 {
     HEAD,
+    HAIR,
     BODY,
     HAND,
     FACE,
