@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using wahaha.API.Handlers;
+using wahaha.API.Handlers.Admin;
 using wahaha.API.Models.Auth;
 
 namespace wahaha.API.Controllers;
@@ -10,105 +11,29 @@ namespace wahaha.API.Controllers;
 [Route("api/[controller]")]
 public class AdminController : ControllerBase
 {
-    private readonly UserManager<ApplicationUser> _userManager;
-    private readonly ILogger<AdminController> _logger;
+    private readonly IRequestHandler<AssignRoleRequest, string> _assignRole;
+    private readonly IRequestHandler<RemoveRoleRequest, string> _removeRole;
+    private readonly IRequestHandler<GetUserRolesRequest, UserRolesDto> _getUserRoles;
 
-    public AdminController(UserManager<ApplicationUser> userManager, ILogger<AdminController> logger)
+    public AdminController(
+        IRequestHandler<AssignRoleRequest, string> assignRole,
+        IRequestHandler<RemoveRoleRequest, string> removeRole,
+        IRequestHandler<GetUserRolesRequest, UserRolesDto> getUserRoles)
     {
-        _userManager = userManager;
-        _logger = logger;
+        _assignRole = assignRole;
+        _removeRole = removeRole;
+        _getUserRoles = getUserRoles;
     }
 
     [HttpPost("assign-role")]
     public async Task<IActionResult> AssignRole(string email, string role)
-    {
-        _logger.LogInformation("Assigning role {Role} to {Email}", role, email);
-
-        var validRoles = new[] { WahahaUserRoles.Admin, WahahaUserRoles.Moderator, WahahaUserRoles.User };
-        if (!validRoles.Contains(role))
-        {
-            _logger.LogWarning("Invalid role {Role} requested", role);
-            return BadRequest($"Invalid role. Valid roles are: {string.Join(", ", validRoles)}");
-        }
-
-        var user = await _userManager.FindByEmailAsync(email);
-        if (user == null)
-        {
-            _logger.LogWarning("User {Email} not found for role assignment", email);
-            return NotFound($"User with email {email} was not found.");
-        }
-
-        if (await _userManager.IsInRoleAsync(user, role))
-        {
-            _logger.LogWarning("User {Email} already has role {Role}", email, role);
-            return BadRequest($"User already has the {role} role.");
-        }
-
-        var result = await _userManager.AddToRoleAsync(user, role);
-        if (!result.Succeeded)
-        {
-            _logger.LogError("Failed to assign role {Role} to {Email}: {Errors}",
-                role, email, string.Join(", ", result.Errors.Select(e => e.Description)));
-            return BadRequest(result.Errors.Select(e => e.Description));
-        }
-
-        _logger.LogInformation("Role {Role} assigned to {Email} successfully", role, email);
-        return Ok($"Role '{role}' assigned to {email} successfully.");
-    }
+        => (await _assignRole.HandleAsync(new AssignRoleRequest(email, role))).ToActionResult();
 
     [HttpPost("remove-role")]
     public async Task<IActionResult> RemoveRole(string email, string role)
-    {
-        _logger.LogInformation("Removing role {Role} from {Email}", role, email);
-
-        var user = await _userManager.FindByEmailAsync(email);
-        if (user == null)
-        {
-            _logger.LogWarning("User {Email} not found for role removal", email);
-            return NotFound($"User with email {email} was not found.");
-        }
-
-        if (!await _userManager.IsInRoleAsync(user, role))
-        {
-            _logger.LogWarning("User {Email} does not have role {Role}", email, role);
-            return BadRequest($"User does not have the {role} role.");
-        }
-
-        if (role == WahahaUserRoles.Admin)
-        {
-            var admins = await _userManager.GetUsersInRoleAsync(WahahaUserRoles.Admin);
-            if (admins.Count == 1)
-            {
-                _logger.LogWarning("Attempt to remove last Admin role from {Email}", email);
-                return BadRequest("Cannot remove the last Admin.");
-            }
-        }
-
-        var result = await _userManager.RemoveFromRoleAsync(user, role);
-        if (!result.Succeeded)
-        {
-            _logger.LogError("Failed to remove role {Role} from {Email}: {Errors}",
-                role, email, string.Join(", ", result.Errors.Select(e => e.Description)));
-            return BadRequest(result.Errors.Select(e => e.Description));
-        }
-
-        _logger.LogInformation("Role {Role} removed from {Email} successfully", role, email);
-        return Ok($"Role '{role}' removed from {email} successfully.");
-    }
+        => (await _removeRole.HandleAsync(new RemoveRoleRequest(email, role))).ToActionResult();
 
     [HttpGet("user-roles")]
     public async Task<IActionResult> GetUserRoles(string email)
-    {
-        _logger.LogDebug("Fetching roles for {Email}", email);
-
-        var user = await _userManager.FindByEmailAsync(email);
-        if (user == null)
-        {
-            _logger.LogWarning("User {Email} not found when fetching roles", email);
-            return NotFound($"User with email {email} was not found.");
-        }
-
-        var roles = await _userManager.GetRolesAsync(user);
-        return Ok(new { Email = email, Roles = roles });
-    }
+        => (await _getUserRoles.HandleAsync(new GetUserRolesRequest(email))).ToActionResult();
 }

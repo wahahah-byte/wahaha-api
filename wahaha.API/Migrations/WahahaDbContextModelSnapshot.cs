@@ -1150,6 +1150,10 @@ namespace wahaha.API.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("is_equipped");
 
+                    b.Property<bool>("IsRotated")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_rotated");
+
                     b.Property<int>("ItemId")
                         .HasColumnType("int")
                         .HasColumnName("item_id");

@@ -34,6 +34,12 @@ public class UserInventory
     [Column("position_y")]
     public int? PositionY { get; set; }
 
+    // Whether the item is currently rotated 90° in the inventory grid.
+    // Frontend toggles this with Q/E while dragging; persists across reloads.
+    [Required]
+    [Column("is_rotated")]
+    public bool IsRotated { get; set; } = false;
+
     // Navigation properties
     [ForeignKey("UserId")]
     public Users? User { get; set; }

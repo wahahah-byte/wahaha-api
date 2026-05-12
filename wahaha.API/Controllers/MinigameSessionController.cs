@@ -1,10 +1,9 @@
-using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using wahaha.API.Models.Domain;
+using wahaha.API.Handlers;
+using wahaha.API.Handlers.MinigameSessions;
 using wahaha.API.Models.DTO;
 using wahaha.API.Models.Filters;
-using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.Controllers;
 
@@ -13,18 +12,27 @@ namespace wahaha.API.Controllers;
 [Route("api/[controller]")]
 public class MinigameSessionsController : ControllerBase
 {
-    private readonly IMinigameSessionRepository _sessionRepository;
-    private readonly IMapper _mapper;
-    private readonly ILogger<MinigameSessionsController> _logger;
+    private readonly IRequestHandler<GetSessionListRequest, IEnumerable<MinigameSessionDto>> _list;
+    private readonly IRequestHandler<GetSessionByIdRequest, MinigameSessionDto> _byId;
+    private readonly IRequestHandler<GetSessionsByGameRequest, IEnumerable<MinigameSessionDto>> _byGame;
+    private readonly IRequestHandler<GetGameLeaderboardRequest, IEnumerable<MinigameSessionLeaderboardDto>> _leaderboard;
+    private readonly IRequestHandler<CreateSessionRequest, MinigameSessionDto> _create;
+    private readonly IRequestHandler<DeleteSessionRequest, Unit> _delete;
 
     public MinigameSessionsController(
-        IMinigameSessionRepository sessionRepository,
-        IMapper mapper,
-        ILogger<MinigameSessionsController> logger)
+        IRequestHandler<GetSessionListRequest, IEnumerable<MinigameSessionDto>> list,
+        IRequestHandler<GetSessionByIdRequest, MinigameSessionDto> byId,
+        IRequestHandler<GetSessionsByGameRequest, IEnumerable<MinigameSessionDto>> byGame,
+        IRequestHandler<GetGameLeaderboardRequest, IEnumerable<MinigameSessionLeaderboardDto>> leaderboard,
+        IRequestHandler<CreateSessionRequest, MinigameSessionDto> create,
+        IRequestHandler<DeleteSessionRequest, Unit> delete)
     {
-        _sessionRepository = sessionRepository;
-        _mapper = mapper;
-        _logger = logger;
+        _list = list;
+        _byId = byId;
+        _byGame = byGame;
+        _leaderboard = leaderboard;
+        _create = create;
+        _delete = delete;
     }
 
     private Guid GetCurrentUserId()
@@ -35,84 +43,30 @@ public class MinigameSessionsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<MinigameSessionDto>>> GetAll([FromQuery] MinigameSessionFilterParams filters)
-    {
-        var userId = GetCurrentUserId();
-        filters.UserId = userId;
-        _logger.LogDebug("Fetching sessions for user {UserId}", userId);
-
-        var sessions = await _sessionRepository.GetFilteredAsync(filters);
-        return Ok(_mapper.Map<IEnumerable<MinigameSessionDto>>(sessions));
-    }
+        => (await _list.HandleAsync(new GetSessionListRequest(GetCurrentUserId(), filters))).ToActionResult();
 
     [HttpGet("{id}")]
     public async Task<ActionResult<MinigameSessionDto>> GetById(int id)
-    {
-        _logger.LogDebug("Fetching session {SessionId}", id);
-        var session = await _sessionRepository.GetByIdAsync(id);
-
-        if (session == null || session.UserId != GetCurrentUserId())
-        {
-            _logger.LogWarning("Session {SessionId} not found or unauthorized", id);
-            return NotFound($"Session with ID {id} was not found.");
-        }
-
-        return Ok(_mapper.Map<MinigameSessionDto>(session));
-    }
+        => (await _byId.HandleAsync(new GetSessionByIdRequest(id, GetCurrentUserId()))).ToActionResult();
 
     [HttpGet("game/{gameId}")]
     public async Task<ActionResult<IEnumerable<MinigameSessionDto>>> GetByGame(int gameId)
-    {
-        var userId = GetCurrentUserId();
-        _logger.LogDebug("Fetching sessions for game {GameId} by user {UserId}", gameId, userId);
-
-        var filters = new MinigameSessionFilterParams
-        {
-            UserId = userId,
-            GameId = gameId
-        };
-        var sessions = await _sessionRepository.GetFilteredAsync(filters);
-        return Ok(_mapper.Map<IEnumerable<MinigameSessionDto>>(sessions));
-    }
+        => (await _byGame.HandleAsync(new GetSessionsByGameRequest(gameId, GetCurrentUserId()))).ToActionResult();
 
     [HttpGet("game/{gameId}/leaderboard")]
     public async Task<ActionResult<IEnumerable<MinigameSessionLeaderboardDto>>> GetLeaderboard(int gameId)
-    {
-        _logger.LogDebug("Fetching leaderboard for game {GameId}", gameId);
-        var leaderboard = await _sessionRepository.GetLeaderboardAsync(gameId);
-        return Ok(_mapper.Map<IEnumerable<MinigameSessionLeaderboardDto>>(leaderboard));
-    }
+        => (await _leaderboard.HandleAsync(new GetGameLeaderboardRequest(gameId))).ToActionResult();
 
     [HttpPost]
     public async Task<ActionResult<MinigameSessionDto>> Create(CreateMinigameSessionDto dto)
     {
-        var userId = GetCurrentUserId();
-        _logger.LogInformation("Creating session for game {GameId} by user {UserId}", dto.GameId, userId);
-
-        var session = _mapper.Map<MinigameSession>(dto);
-        session.UserId = userId;
-        var created = await _sessionRepository.CreateAsync(session);
-
-        _logger.LogInformation("Session {SessionId} created for game {GameId} by user {UserId}",
-            created.SessionId, dto.GameId, userId);
-
-        return CreatedAtAction(nameof(GetById), new { id = created.SessionId },
-            _mapper.Map<MinigameSessionDto>(created));
+        var result = await _create.HandleAsync(new CreateSessionRequest(GetCurrentUserId(), dto));
+        if (result.Status == HandlerStatus.Ok && result.Value != null)
+            return CreatedAtAction(nameof(GetById), new { id = result.Value.SessionId }, result.Value);
+        return result.ToActionResult();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
-    {
-        _logger.LogInformation("Deleting session {SessionId}", id);
-        var session = await _sessionRepository.GetByIdAsync(id);
-
-        if (session == null || session.UserId != GetCurrentUserId())
-        {
-            _logger.LogWarning("Session {SessionId} not found or unauthorized for deletion", id);
-            return NotFound($"Session with ID {id} was not found.");
-        }
-
-        await _sessionRepository.DeleteAsync(id);
-        _logger.LogInformation("Session {SessionId} deleted successfully", id);
-        return NoContent();
-    }
+        => (await _delete.HandleAsync(new DeleteSessionRequest(id, GetCurrentUserId()))).ToActionResult();
 }

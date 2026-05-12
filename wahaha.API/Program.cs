@@ -14,6 +14,7 @@ using wahaha.API.Repositories;
 using wahaha.API.Repositories.Interfaces;
 using wahaha.API.Services;
 using wahaha.API.Converters;
+using wahaha.API.Handlers;
 using wahaha.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -130,6 +131,11 @@ builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IBlobService, BlobService>();
 builder.Services.AddScoped<ITaskPenaltyService, TaskPenaltyService>();
+
+// Request handlers — one per endpoint, registered via the extension method
+// in HandlerRegistration.cs. Add new handlers to that file when extending the
+// API surface.
+builder.Services.AddRequestHandlers();
 
 builder.Services.AddHostedService<PenaltyJob>();
 builder.Services.AddHostedService<ArchiveJob>();

@@ -1,11 +1,11 @@
-using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using wahaha.API.Handlers;
+using wahaha.API.Handlers.PointTransactions;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO;
 using wahaha.API.Models.Filters;
 using wahaha.API.Models.Pagination;
-using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.Controllers;
 
@@ -14,18 +14,24 @@ namespace wahaha.API.Controllers;
 [Route("api/[controller]")]
 public class PointTransactionsController : ControllerBase
 {
-    private readonly IPointTransactionRepository _pointTransactionRepository;
-    private readonly IMapper _mapper;
-    private readonly ILogger<PointTransactionsController> _logger;
+    private readonly IRequestHandler<GetTransactionListRequest, PagedResult<PointTransactionDto>> _list;
+    private readonly IRequestHandler<GetTransactionByIdRequest, PointTransactionDto> _byId;
+    private readonly IRequestHandler<GetTransactionsByTypeRequest, IEnumerable<PointTransactionDto>> _byType;
+    private readonly IRequestHandler<CreateTransactionRequest, PointTransactionDto> _create;
+    private readonly IRequestHandler<DeleteTransactionRequest, Unit> _delete;
 
     public PointTransactionsController(
-        IPointTransactionRepository pointTransactionRepository,
-        IMapper mapper,
-        ILogger<PointTransactionsController> logger)
+        IRequestHandler<GetTransactionListRequest, PagedResult<PointTransactionDto>> list,
+        IRequestHandler<GetTransactionByIdRequest, PointTransactionDto> byId,
+        IRequestHandler<GetTransactionsByTypeRequest, IEnumerable<PointTransactionDto>> byType,
+        IRequestHandler<CreateTransactionRequest, PointTransactionDto> create,
+        IRequestHandler<DeleteTransactionRequest, Unit> delete)
     {
-        _pointTransactionRepository = pointTransactionRepository;
-        _mapper = mapper;
-        _logger = logger;
+        _list = list;
+        _byId = byId;
+        _byType = byType;
+        _create = create;
+        _delete = delete;
     }
 
     private Guid GetCurrentUserId()
@@ -36,79 +42,26 @@ public class PointTransactionsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<PointTransactionDto>>> GetAll([FromQuery] PointTransactionFilterParams filters)
-    {
-        var userId = GetCurrentUserId();
-        filters.UserId = userId;
-        _logger.LogDebug("Fetching point transactions for user {UserId}", userId);
-
-        var result = await _pointTransactionRepository.GetFilteredAsync(filters);
-
-        return Ok(new PagedResult<PointTransactionDto>
-        {
-            Data = _mapper.Map<IEnumerable<PointTransactionDto>>(result.Data),
-            PageNumber = result.PageNumber,
-            PageSize = result.PageSize,
-            TotalCount = result.TotalCount
-        });
-    }
+        => (await _list.HandleAsync(new GetTransactionListRequest(GetCurrentUserId(), filters))).ToActionResult();
 
     [HttpGet("{id}")]
     public async Task<ActionResult<PointTransactionDto>> GetById(int id)
-    {
-        _logger.LogDebug("Fetching transaction {TransactionId}", id);
-        var transaction = await _pointTransactionRepository.GetByIdAsync(id);
-
-        if (transaction == null || transaction.UserId != GetCurrentUserId())
-        {
-            _logger.LogWarning("Transaction {TransactionId} not found or unauthorized", id);
-            return NotFound($"Transaction with ID {id} was not found.");
-        }
-
-        return Ok(_mapper.Map<PointTransactionDto>(transaction));
-    }
+        => (await _byId.HandleAsync(new GetTransactionByIdRequest(id, GetCurrentUserId()))).ToActionResult();
 
     [HttpGet("type/{type}")]
     public async Task<ActionResult<IEnumerable<PointTransactionDto>>> GetByType(TransactionType type)
-    {
-        var userId = GetCurrentUserId();
-        _logger.LogDebug("Fetching {Type} transactions for user {UserId}", type, userId);
-
-        var transactions = await _pointTransactionRepository.GetByUserAndTypeAsync(userId, type);
-        return Ok(_mapper.Map<IEnumerable<PointTransactionDto>>(transactions));
-    }
+        => (await _byType.HandleAsync(new GetTransactionsByTypeRequest(GetCurrentUserId(), type))).ToActionResult();
 
     [HttpPost]
     public async Task<ActionResult<PointTransactionDto>> Create(CreatePointTransactionDto dto)
     {
-        var userId = GetCurrentUserId();
-        _logger.LogInformation("Creating {Type} transaction of {Amount} points for user {UserId}",
-            dto.Type, dto.Amount, userId);
-
-        var transaction = _mapper.Map<PointTransaction>(dto);
-        transaction.UserId = userId;
-        var created = await _pointTransactionRepository.CreateAsync(transaction);
-
-        _logger.LogInformation("Transaction {TransactionId} created for user {UserId}",
-            created.TransactionId, userId);
-
-        return CreatedAtAction(nameof(GetById), new { id = created.TransactionId },
-            _mapper.Map<PointTransactionDto>(created));
+        var result = await _create.HandleAsync(new CreateTransactionRequest(GetCurrentUserId(), dto));
+        if (result.Status == HandlerStatus.Ok && result.Value != null)
+            return CreatedAtAction(nameof(GetById), new { id = result.Value.TransactionId }, result.Value);
+        return result.ToActionResult();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
-    {
-        _logger.LogInformation("Deleting transaction {TransactionId}", id);
-        var transaction = await _pointTransactionRepository.GetByIdAsync(id);
-
-        if (transaction == null || transaction.UserId != GetCurrentUserId())
-        {
-            _logger.LogWarning("Transaction {TransactionId} not found or unauthorized for deletion", id);
-            return NotFound($"Transaction with ID {id} was not found.");
-        }
-
-        await _pointTransactionRepository.DeleteAsync(id);
-        _logger.LogInformation("Transaction {TransactionId} deleted successfully", id);
-        return NoContent();
-    }
+        => (await _delete.HandleAsync(new DeleteTransactionRequest(id, GetCurrentUserId()))).ToActionResult();
 }

@@ -9,6 +9,7 @@ public class UserInventoryDto
     public bool IsEquipped { get; set; }
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
+    public bool IsRotated { get; set; }
     public AvatarItemDto? AvatarItem { get; set; }
 }
 
@@ -21,8 +22,11 @@ public class CreateUserInventoryDto
 
 // Sent to PATCH /api/UserInventory/{id}/position to relocate a single item.
 // Null values clear the position (item drops back into auto-placement).
+// IsRotated is optional — only applied when present in the payload, so the
+// existing position-only callers keep working untouched.
 public class UpdateInventoryPositionDto
 {
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
+    public bool? IsRotated { get; set; }
 }
