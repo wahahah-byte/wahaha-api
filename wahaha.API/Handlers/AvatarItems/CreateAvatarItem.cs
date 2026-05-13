@@ -56,7 +56,14 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
                 item.ContentMaxX = bounds.MaxX;
                 item.ContentMaxY = bounds.MaxY;
             }
-            item.PreviewAssetUrl = await _blobService.UploadAsync(dto.Image, ContainerName);
+            // Predictable blob name — "{slot}_{slug(name)}.png" — so the
+            // stored URL is derivable from the item's metadata and the
+            // static demo / mock can stay aligned with reality. BlobService
+            // appends a "-2", "-3", … suffix if the slug is already taken.
+            item.PreviewAssetUrl = await _blobService.UploadAsync(
+                dto.Image,
+                ContainerName,
+                BuildBlobName(dto.Slot, dto.Name));
             _logger.LogInformation("Image uploaded for avatar item {Name}: {Url}", dto.Name, item.PreviewAssetUrl);
         }
 
@@ -71,7 +78,10 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
                 _logger.LogWarning("Invalid secondary image upload for avatar item {Name}", dto.Name);
                 return HandlerResult<AvatarItemDto>.BadRequest("Invalid secondary image. Only JPG, PNG and WebP files under 5MB are allowed.");
             }
-            item.SecondaryAssetUrl = await _blobService.UploadAsync(dto.SecondaryImage, ContainerName);
+            item.SecondaryAssetUrl = await _blobService.UploadAsync(
+                dto.SecondaryImage,
+                ContainerName,
+                BuildBlobName(dto.Slot, dto.Name) + "_back");
             _logger.LogInformation("Secondary image uploaded for avatar item {Name}: {Url}", dto.Name, item.SecondaryAssetUrl);
         }
 
@@ -86,4 +96,10 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
         var maxSize = 5 * 1024 * 1024;
         return allowedTypes.Contains(file.ContentType.ToLower()) && file.Length <= maxSize;
     }
+
+    // Compose the base name the blob will be stored as. BlobService runs the
+    // result through its own slug pass, so this only has to be human-readable
+    // — punctuation and casing are normalised downstream.
+    private static string BuildBlobName(string slot, string name)
+        => $"{slot}_{name}";
 }

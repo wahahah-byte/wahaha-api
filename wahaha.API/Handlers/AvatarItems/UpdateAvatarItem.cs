@@ -75,7 +75,13 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
                 item.ContentMaxX = null;
                 item.ContentMaxY = null;
             }
-            item.PreviewAssetUrl = await _blobService.UploadAsync(request.Dto.Image, ContainerName);
+            // Use the incoming DTO's slot/name so a rename-and-reupload picks
+            // up the new slug; the existing blob was already deleted above
+            // so the collision-resolver won't shoulder-bump against it.
+            item.PreviewAssetUrl = await _blobService.UploadAsync(
+                request.Dto.Image,
+                ContainerName,
+                BuildBlobName(request.Dto.Slot, request.Dto.Name));
             _logger.LogInformation("Image updated for avatar item {ItemId}: {Url}", request.ItemId, item.PreviewAssetUrl);
         }
 
@@ -93,7 +99,10 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             }
             if (!string.IsNullOrEmpty(item.SecondaryAssetUrl))
                 await _blobService.DeleteAsync(item.SecondaryAssetUrl, ContainerName);
-            item.SecondaryAssetUrl = await _blobService.UploadAsync(request.Dto.SecondaryImage, ContainerName);
+            item.SecondaryAssetUrl = await _blobService.UploadAsync(
+                request.Dto.SecondaryImage,
+                ContainerName,
+                BuildBlobName(request.Dto.Slot, request.Dto.Name) + "_back");
             _logger.LogInformation("Secondary image updated for avatar item {ItemId}: {Url}", request.ItemId, item.SecondaryAssetUrl);
         }
 
@@ -109,4 +118,9 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
         var maxSize = 5 * 1024 * 1024;
         return allowedTypes.Contains(file.ContentType.ToLower()) && file.Length <= maxSize;
     }
+
+    // Mirror of CreateAvatarItemHandler's helper. BlobService slugifies the
+    // result so this can stay loose ("HAT_Alien Helmet" → hat_alien_helmet).
+    private static string BuildBlobName(string slot, string name)
+        => $"{slot}_{name}";
 }
