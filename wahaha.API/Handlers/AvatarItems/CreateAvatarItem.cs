@@ -81,7 +81,7 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
             item.SecondaryAssetUrl = await _blobService.UploadAsync(
                 dto.SecondaryImage,
                 ContainerName,
-                BuildBlobName(dto.Slot, dto.Name) + "_back");
+                BuildBlobName(dto.Slot, dto.Name) + SecondarySuffix(dto.Slot));
             _logger.LogInformation("Secondary image uploaded for avatar item {Name}: {Url}", dto.Name, item.SecondaryAssetUrl);
         }
 
@@ -102,4 +102,12 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
     // — punctuation and casing are normalised downstream.
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
+
+    // Semantic suffix for the secondary blob. Mirrors ChibiAvatar's
+    // slot-dependent z-order resolution:
+    //   HAIR_FRONT   primary = bangs    → secondary = "_back"  (back strands)
+    //   CAPE         primary = back     → secondary = "_front" (front drape)
+    //   WEAPON_FRONT primary = front    → secondary = "_back"  (shaft behind)
+    private static string SecondarySuffix(string slot)
+        => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase) ? "_front" : "_back";
 }

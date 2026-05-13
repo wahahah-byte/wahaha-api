@@ -102,7 +102,7 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             item.SecondaryAssetUrl = await _blobService.UploadAsync(
                 request.Dto.SecondaryImage,
                 ContainerName,
-                BuildBlobName(request.Dto.Slot, request.Dto.Name) + "_back");
+                BuildBlobName(request.Dto.Slot, request.Dto.Name) + SecondarySuffix(request.Dto.Slot));
             _logger.LogInformation("Secondary image updated for avatar item {ItemId}: {Url}", request.ItemId, item.SecondaryAssetUrl);
         }
 
@@ -123,4 +123,10 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
     // result so this can stay loose ("HAT_Alien Helmet" → hat_alien_helmet).
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
+
+    // CAPE secondary = front drape; HAIR_FRONT and WEAPON_FRONT secondaries
+    // = back. Mirrors CreateAvatarItemHandler.SecondarySuffix and
+    // ChibiAvatar's z-order resolution.
+    private static string SecondarySuffix(string slot)
+        => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase) ? "_front" : "_back";
 }

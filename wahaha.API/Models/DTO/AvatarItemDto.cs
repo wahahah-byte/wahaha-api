@@ -33,6 +33,17 @@ public class AvatarItemDto
     public double? RenderScale { get; set; }
     public int? SourceWidth { get; set; }
     public int? SourceHeight { get; set; }
+
+    // Tight bounding box of non-transparent pixels in the source PNG, in
+    // source-pixel coords (origin top-left). Populated by ContentBoundsService
+    // at upload / register / recompute time. Consumed by the client's
+    // boundsTransformFor() to auto-centre the visible content inside the
+    // inventory card and admin row thumbnail. Null for legacy items that
+    // pre-date the feature — client falls back to slot defaults.
+    public int? ContentMinX { get; set; }
+    public int? ContentMinY { get; set; }
+    public int? ContentMaxX { get; set; }
+    public int? ContentMaxY { get; set; }
 }
 
 public class CreateAvatarItemDto
