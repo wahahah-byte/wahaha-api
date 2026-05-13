@@ -59,6 +59,17 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
             .FirstOrDefaultAsync(u => u.Username == username);
     }
 
+    // Email match is case-insensitive at the DB layer (the email column
+    // collates as Latin1_General_CI_AS by default on SQL Server). Used by
+    // the admin grant-item endpoint to resolve a typed-in email to a
+    // domain Users row.
+    public async Task<Users?> GetByEmailAsync(string email)
+    {
+        _logger.LogDebug("Fetching user by email {Email}", email);
+        return await _dbSet
+            .FirstOrDefaultAsync(u => u.Email == email);
+    }
+
     public async Task<bool> AddPointsAsync(Guid id, int points)
     {
         _logger.LogInformation("Adding {Points} points to user {UserId}", points, id);

@@ -28,6 +28,11 @@
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.14.9" />
+    <!-- Pinned to 2.1.x because v3+ switched to a commercial licence; 2.1
+         is the final Apache 2.0 release and still receives security patches.
+         Used by ContentBoundsService to compute the non-transparent bbox of
+         uploaded avatar PNGs so the inventory cards can auto-centre them. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.*" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.18.0" />
   </ItemGroup>
 

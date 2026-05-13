@@ -11,6 +11,7 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
 {
     private readonly IAvatarItemRepository _repo;
     private readonly IBlobService _blobService;
+    private readonly IContentBoundsService _boundsService;
     private readonly IMapper _mapper;
     private readonly ILogger<UpdateAvatarItemHandler> _logger;
     private const string ContainerName = "avatar-items";
@@ -18,11 +19,13 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
     public UpdateAvatarItemHandler(
         IAvatarItemRepository repo,
         IBlobService blobService,
+        IContentBoundsService boundsService,
         IMapper mapper,
         ILogger<UpdateAvatarItemHandler> logger)
     {
         _repo = repo;
         _blobService = blobService;
+        _boundsService = boundsService;
         _mapper = mapper;
         _logger = logger;
     }
@@ -49,8 +52,49 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             }
             if (!string.IsNullOrEmpty(item.PreviewAssetUrl))
                 await _blobService.DeleteAsync(item.PreviewAssetUrl, ContainerName);
+            // Compute the bbox of the new image before uploading. Stored
+            // here directly on the entity; AutoMapper.Mapper below copies
+            // the rest of the DTO's metadata changes without touching these
+            // bounds (the source UpdateAvatarItemDto has no bbox fields).
+            var bounds = await _boundsService.ComputeAsync(request.Dto.Image, ct);
+            if (bounds != null)
+            {
+                item.ContentMinX = bounds.MinX;
+                item.ContentMinY = bounds.MinY;
+                item.ContentMaxX = bounds.MaxX;
+                item.ContentMaxY = bounds.MaxY;
+            }
+            else
+            {
+                // Image accepted but bbox couldn't be derived (transparent,
+                // corrupt, etc.) — clear stale bounds so the client falls
+                // back to slot defaults rather than rendering the previous
+                // image's bbox over the new image.
+                item.ContentMinX = null;
+                item.ContentMinY = null;
+                item.ContentMaxX = null;
+                item.ContentMaxY = null;
+            }
             item.PreviewAssetUrl = await _blobService.UploadAsync(request.Dto.Image, ContainerName);
             _logger.LogInformation("Image updated for avatar item {ItemId}: {Url}", request.ItemId, item.PreviewAssetUrl);
+        }
+
+        // Secondary image — same drop-old + upload-new dance, but no bbox
+        // scan since the secondary renders at HAIR_BACK z behind the primary
+        // and the inventory card never displays it. Sending no secondary
+        // image leaves the existing SecondaryAssetUrl untouched (use the
+        // dedicated clear endpoint if you need to remove it entirely).
+        if (request.Dto.SecondaryImage != null)
+        {
+            if (!IsValidImage(request.Dto.SecondaryImage))
+            {
+                _logger.LogWarning("Invalid secondary image upload for avatar item {ItemId}", request.ItemId);
+                return HandlerResult<Unit>.BadRequest("Invalid secondary image. Only JPG, PNG and WebP files under 5MB are allowed.");
+            }
+            if (!string.IsNullOrEmpty(item.SecondaryAssetUrl))
+                await _blobService.DeleteAsync(item.SecondaryAssetUrl, ContainerName);
+            item.SecondaryAssetUrl = await _blobService.UploadAsync(request.Dto.SecondaryImage, ContainerName);
+            _logger.LogInformation("Secondary image updated for avatar item {ItemId}: {Url}", request.ItemId, item.SecondaryAssetUrl);
         }
 
         _mapper.Map(request.Dto, item);

@@ -9,6 +9,7 @@ public interface IUserRepository : IRepository<Users, Guid>
     Task<PagedResult<Users>> GetAllWithTransactionsAsync(UserFilterParams filters);
     Task<Users?> GetByIdWithTransactionsAsync(Guid id);
     Task<Users?> GetByUsernameAsync(string username);
+    Task<Users?> GetByEmailAsync(string email);
     Task<bool> AddPointsAsync(Guid id, int points);
     Task<bool> SpendPointsAsync(Guid id, int points);
     Task<bool> RefundPointsAsync(Guid id, int points);

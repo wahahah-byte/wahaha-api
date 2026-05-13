@@ -33,6 +33,8 @@ public static class HandlerRegistration
         services.AddScoped<IRequestHandler<AvatarItems.RegisterAvatarItemByUrlRequest, AvatarItemDto>, AvatarItems.RegisterAvatarItemByUrlHandler>();
         services.AddScoped<IRequestHandler<AvatarItems.UpdateAvatarItemRequest, Unit>, AvatarItems.UpdateAvatarItemHandler>();
         services.AddScoped<IRequestHandler<AvatarItems.ToggleAvatarItemAvailabilityRequest, Unit>, AvatarItems.ToggleAvatarItemAvailabilityHandler>();
+        services.AddScoped<IRequestHandler<AvatarItems.RecomputeAvatarItemBoundsRequest, AvatarItemDto>, AvatarItems.RecomputeAvatarItemBoundsHandler>();
+        services.AddScoped<IRequestHandler<AvatarItems.GrantAvatarItemRequest, UserInventoryDto>, AvatarItems.GrantAvatarItemHandler>();
         services.AddScoped<IRequestHandler<AvatarItems.DeleteAvatarItemRequest, Unit>, AvatarItems.DeleteAvatarItemHandler>();
 
         // Minigames

@@ -16,13 +16,15 @@ public class MappingProfile : Profile
         CreateMap<CreateAvatarItemDto, AvatarItem>()
             .ForMember(dest => dest.Slot, opt => opt.MapFrom(src => Enum.Parse<ItemSlot>(src.Slot, true)))
             .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)))
-            .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())  // handled by BlobService
+            .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())   // handled by BlobService
+            .ForMember(dest => dest.SecondaryAssetUrl, opt => opt.Ignore()) // handled by BlobService
             .ForMember(dest => dest.UserInventories, opt => opt.Ignore());
 
         CreateMap<UpdateAvatarItemDto, AvatarItem>()
             .ForMember(dest => dest.Slot, opt => opt.MapFrom(src => Enum.Parse<ItemSlot>(src.Slot, true)))
             .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)))
-            .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())  // handled by BlobService
+            .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())   // handled by BlobService
+            .ForMember(dest => dest.SecondaryAssetUrl, opt => opt.Ignore()) // handled by BlobService
             .ForMember(dest => dest.UserInventories, opt => opt.Ignore());
 
         // Minigame

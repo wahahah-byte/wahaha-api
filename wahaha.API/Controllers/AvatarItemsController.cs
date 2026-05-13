@@ -22,6 +22,8 @@ public class AvatarItemsController : ControllerBase
     private readonly IRequestHandler<RegisterAvatarItemByUrlRequest, AvatarItemDto> _registerByUrl;
     private readonly IRequestHandler<UpdateAvatarItemRequest, Unit> _update;
     private readonly IRequestHandler<ToggleAvatarItemAvailabilityRequest, Unit> _toggle;
+    private readonly IRequestHandler<RecomputeAvatarItemBoundsRequest, AvatarItemDto> _recomputeBounds;
+    private readonly IRequestHandler<GrantAvatarItemRequest, UserInventoryDto> _grant;
     private readonly IRequestHandler<DeleteAvatarItemRequest, Unit> _delete;
 
     public AvatarItemsController(
@@ -33,6 +35,8 @@ public class AvatarItemsController : ControllerBase
         IRequestHandler<RegisterAvatarItemByUrlRequest, AvatarItemDto> registerByUrl,
         IRequestHandler<UpdateAvatarItemRequest, Unit> update,
         IRequestHandler<ToggleAvatarItemAvailabilityRequest, Unit> toggle,
+        IRequestHandler<RecomputeAvatarItemBoundsRequest, AvatarItemDto> recomputeBounds,
+        IRequestHandler<GrantAvatarItemRequest, UserInventoryDto> grant,
         IRequestHandler<DeleteAvatarItemRequest, Unit> delete)
     {
         _list = list;
@@ -43,6 +47,8 @@ public class AvatarItemsController : ControllerBase
         _registerByUrl = registerByUrl;
         _update = update;
         _toggle = toggle;
+        _recomputeBounds = recomputeBounds;
+        _grant = grant;
         _delete = delete;
     }
 
@@ -103,6 +109,27 @@ public class AvatarItemsController : ControllerBase
     [HttpPatch("{id}/toggleavailability")]
     public async Task<IActionResult> ToggleAvailability(int id)
         => (await _toggle.HandleAsync(new ToggleAvatarItemAvailabilityRequest(id))).ToActionResult();
+
+    // Re-scans the item's PreviewAssetUrl and stores fresh content bounds.
+    // Returns the updated DTO so the admin UI can splice it in without a
+    // full re-fetch. See RecomputeAvatarItemBoundsHandler for the supported
+    // URL shapes — only absolute http(s) URLs work; relative seed paths
+    // need to be edited and re-uploaded through the form instead.
+    [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
+    [HttpPost("{id}/recompute-bounds")]
+    public async Task<ActionResult<AvatarItemDto>> RecomputeBounds(int id)
+        => (await _recomputeBounds.HandleAsync(new RecomputeAvatarItemBoundsRequest(id))).ToActionResult();
+
+    // Admin convenience for handing an item to a user without going
+    // through the regular acquire flow (which charges points). Body's
+    // TargetEmail is optional — empty / missing grants to the calling
+    // admin themselves. AutoEquip flips the new inventory row to
+    // equipped (unequipping any other item in the same slot).
+    [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
+    [HttpPost("{id}/grant")]
+    public async Task<ActionResult<UserInventoryDto>> Grant(int id, [FromBody] GrantAvatarItemDto dto)
+        => (await _grant.HandleAsync(new GrantAvatarItemRequest(
+            GetCurrentUserId(), id, dto?.TargetEmail, dto?.AutoEquip ?? false))).ToActionResult();
 
     [Authorize(Roles = WahahaUserRoles.Admin)]
     [HttpDelete("{id}")]

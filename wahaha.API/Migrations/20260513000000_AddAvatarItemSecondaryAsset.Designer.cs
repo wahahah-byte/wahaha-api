@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using wahaha.API.Data;
 
@@ -11,9 +12,11 @@ using wahaha.API.Data;
 namespace wahaha.API.Migrations
 {
     [DbContext(typeof(WahahaDbContext))]
-    partial class WahahaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513000000_AddAvatarItemSecondaryAsset")]
+    partial class AddAvatarItemSecondaryAsset
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -109,11 +112,6 @@ namespace wahaha.API.Migrations
                     b.Property<double?>("RenderScale")
                         .HasColumnType("float")
                         .HasColumnName("render_scale");
-
-                    b.Property<string>("SecondaryAssetUrl")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)")
-                        .HasColumnName("secondary_asset_url");
 
                     b.Property<string>("Slot")
                         .IsRequired()
