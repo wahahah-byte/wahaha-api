@@ -159,12 +159,15 @@ builder.Services.AddCors(options =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            policy.WithOrigins("http://localhost:3000").AllowAnyHeader().AllowAnyMethod();
+            policy
+                .WithOrigins("http://localhost:3000", "http://localhost:8081")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
         }
         else
         {
             policy
-             .WithOrigins("http://localhost:3000")
+                .WithOrigins("http://localhost:3000")
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         }
