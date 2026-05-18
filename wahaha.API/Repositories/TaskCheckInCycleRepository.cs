@@ -32,6 +32,15 @@ public class TaskCheckInCycleRepository : Repository<TaskCheckInCycle, int>, ITa
             .FirstOrDefaultAsync();
     }
 
+    public async Task<TaskCheckInCycle?> GetLatestCheckinByTaskIdAsync(Guid taskId)
+    {
+        return await _dbSet
+            .Where(c => c.TaskId == taskId && c.CycleType == "checkin")
+            .OrderByDescending(c => c.CheckInDate)
+            .ThenByDescending(c => c.CycleId)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task<int> GetDailyCounterSumAsync(Guid taskId, DateTime date)
     {
         return await _dbSet

@@ -46,8 +46,14 @@ public sealed class UndoCheckInHandler : IRequestHandler<UndoCheckInHandlerReque
         if (cycle.CycleType != "checkin")
             return HandlerResult<UndoCheckInResponse>.BadRequest("This cycle is not a check-in and cannot be undone via this endpoint.");
 
-        var latest = await _cycleRepo.GetLatestByTaskIdAsync(req.TaskId);
-        if (latest == null || latest.CycleId != cycle.CycleId)
+        // Compare against the latest CHECKIN cycle, not the latest cycle of
+        // any type — a counter quick-log ("log" cycleType) for the same day
+        // can land after the check-in and would otherwise lock the check-in
+        // out of being undone. Logs are independent records of progress
+        // toward the goal and don't need to be reversed when the check-in
+        // commitment is undone; they stay as historical counter values.
+        var latestCheckin = await _cycleRepo.GetLatestCheckinByTaskIdAsync(req.TaskId);
+        if (latestCheckin == null || latestCheckin.CycleId != cycle.CycleId)
             return HandlerResult<UndoCheckInResponse>.BadRequest("Only the most recent check-in can be undone.");
 
         if (cycle.CheckInDate.Date != req.ClientToday.Date)
