@@ -24,6 +24,7 @@ public class AvatarItemsController : ControllerBase
     private readonly IRequestHandler<ToggleAvatarItemAvailabilityRequest, Unit> _toggle;
     private readonly IRequestHandler<RecomputeAvatarItemBoundsRequest, AvatarItemDto> _recomputeBounds;
     private readonly IRequestHandler<GrantAvatarItemRequest, UserInventoryDto> _grant;
+    private readonly IRequestHandler<PurchaseAvatarItemRequest, PurchaseAvatarItemResponseDto> _purchase;
     private readonly IRequestHandler<DeleteAvatarItemRequest, Unit> _delete;
 
     public AvatarItemsController(
@@ -37,6 +38,7 @@ public class AvatarItemsController : ControllerBase
         IRequestHandler<ToggleAvatarItemAvailabilityRequest, Unit> toggle,
         IRequestHandler<RecomputeAvatarItemBoundsRequest, AvatarItemDto> recomputeBounds,
         IRequestHandler<GrantAvatarItemRequest, UserInventoryDto> grant,
+        IRequestHandler<PurchaseAvatarItemRequest, PurchaseAvatarItemResponseDto> purchase,
         IRequestHandler<DeleteAvatarItemRequest, Unit> delete)
     {
         _list = list;
@@ -49,6 +51,7 @@ public class AvatarItemsController : ControllerBase
         _toggle = toggle;
         _recomputeBounds = recomputeBounds;
         _grant = grant;
+        _purchase = purchase;
         _delete = delete;
     }
 
@@ -130,6 +133,17 @@ public class AvatarItemsController : ControllerBase
     public async Task<ActionResult<UserInventoryDto>> Grant(int id, [FromBody] GrantAvatarItemDto dto)
         => (await _grant.HandleAsync(new GrantAvatarItemRequest(
             GetCurrentUserId(), id, dto?.TargetEmail, dto?.AutoEquip ?? false))).ToActionResult();
+
+    // Shop purchase — any authenticated user. UserId comes from the JWT
+    // (no target field on PurchaseAvatarItemDto), so a user can only buy
+    // for themselves. Body is optional; missing body defaults to no
+    // auto-equip. Returns the new inventory row plus the updated balance
+    // so the client can refresh both without a follow-up /me call.
+    [Authorize]
+    [HttpPost("{id}/purchase")]
+    public async Task<ActionResult<PurchaseAvatarItemResponseDto>> Purchase(int id, [FromBody] PurchaseAvatarItemDto? dto)
+        => (await _purchase.HandleAsync(new PurchaseAvatarItemRequest(
+            GetCurrentUserId(), id, dto?.AutoEquip ?? false))).ToActionResult();
 
     [Authorize(Roles = WahahaUserRoles.Admin)]
     [HttpDelete("{id}")]

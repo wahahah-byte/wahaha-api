@@ -27,10 +27,6 @@ public sealed class SetInventoryPositionHandler : IRequestHandler<SetInventoryPo
             _logger.LogWarning("Inventory entry {InventoryId} not found or unauthorized for position update", request.InventoryId);
             return HandlerResult<Unit>.NotFound($"Inventory entry with ID {request.InventoryId} was not found.");
         }
-
-        // Layout selects which placement pair to update. Default to desktop so
-        // existing callers (web desktop, older mobile builds before per-shape
-        // persistence) keep writing the same column they always did.
         var isMobile = string.Equals(request.Dto.Layout, "mobile", StringComparison.OrdinalIgnoreCase);
         if (isMobile)
         {
@@ -42,9 +38,6 @@ public sealed class SetInventoryPositionHandler : IRequestHandler<SetInventoryPo
             entry.PositionX = request.Dto.PositionX;
             entry.PositionY = request.Dto.PositionY;
         }
-        // Only overwrite rotation when the caller explicitly sends one — keeps
-        // older position-only clients backward compatible. Rotation is shared
-        // across layouts since only desktop exposes a rotate affordance.
         if (request.Dto.IsRotated.HasValue) entry.IsRotated = request.Dto.IsRotated.Value;
         await _repo.UpdateAsync(entry);
         return HandlerResult<Unit>.NoContent();

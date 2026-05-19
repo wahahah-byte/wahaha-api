@@ -31,11 +31,13 @@ public sealed class GetTaskByIdHandler : IRequestHandler<GetTaskByIdRequest, Tas
             return HandlerResult<TaskDto>.NotFound($"Task with ID {request.TaskId} was not found.");
         }
         var dto = _mapper.Map<TaskDto>(task);
-        // GetByIdAsync doesn't Include Streaks, so the mapped DTO has null
-        // streak counts. Look up the task's active streak the same way
-        // GetTaskListHandler does so the detail endpoint matches the list.
         var streak = await _streakRepo.GetByTaskIdAsync(request.TaskId);
-        if (streak != null && streak.UserId == request.UserId && streak.IsActive)
+        // Populate streak counts regardless of IsActive — a dormant streak
+        // still has a CurrentCount the client wants to show (and skipping
+        // it made the tier badge vanish after an undo that restored a
+        // streak to its pre-reset inactive state). Mirrors the equivalent
+        // change in TaskRepository.GetFilteredAsync.
+        if (streak != null && streak.UserId == request.UserId)
         {
             dto.CurrentStreakCount = streak.CurrentCount;
             dto.LongestStreakCount = streak.LongestCount;

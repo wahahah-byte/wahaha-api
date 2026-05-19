@@ -153,6 +153,24 @@ public class GrantAvatarItemDto
     public bool AutoEquip { get; set; } = false;
 }
 
+// User-facing body for POST /api/AvatarItems/{id}/purchase. UserId is
+// resolved from the JWT — there is no target field, you can only buy
+// for yourself.
+public class PurchaseAvatarItemDto
+{
+    public bool AutoEquip { get; set; } = false;
+}
+
+// Response wrapper for the shop purchase flow — the new inventory row
+// plus the user's post-purchase balance, both delivered in one shot so
+// the client can update its grid and balance display atomically without
+// a follow-up /me fetch.
+public class PurchaseAvatarItemResponseDto
+{
+    public UserInventoryDto Inventory { get; set; } = null!;
+    public int NewBalance { get; set; }
+}
+
 public class UpdateAvatarItemDto
 {
     public int ItemId { get; set; }

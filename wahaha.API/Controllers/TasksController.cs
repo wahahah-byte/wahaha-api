@@ -28,6 +28,7 @@ public class TasksController : ControllerBase
     private readonly IRequestHandler<LogCounterRequest, CheckInCycleDto> _log;
     private readonly IRequestHandler<UpdateCheckInCycleRequest, Unit> _updateCycle;
     private readonly IRequestHandler<UndoCheckInHandlerRequest, UndoCheckInResponse> _undo;
+    private readonly IRequestHandler<RepairCheckInRequest, RepairCheckInResponse> _repair;
     private readonly IRequestHandler<DeleteLogCycleRequest, Unit> _deleteLog;
     private readonly IRequestHandler<DeleteTaskRequest, Unit> _delete;
 
@@ -47,6 +48,7 @@ public class TasksController : ControllerBase
         IRequestHandler<LogCounterRequest, CheckInCycleDto> log,
         IRequestHandler<UpdateCheckInCycleRequest, Unit> updateCycle,
         IRequestHandler<UndoCheckInHandlerRequest, UndoCheckInResponse> undo,
+        IRequestHandler<RepairCheckInRequest, RepairCheckInResponse> repair,
         IRequestHandler<DeleteLogCycleRequest, Unit> deleteLog,
         IRequestHandler<DeleteTaskRequest, Unit> delete)
     {
@@ -65,6 +67,7 @@ public class TasksController : ControllerBase
         _log = log;
         _updateCycle = updateCycle;
         _undo = undo;
+        _repair = repair;
         _deleteLog = deleteLog;
         _delete = delete;
     }
@@ -147,6 +150,12 @@ public class TasksController : ControllerBase
     [HttpPost("{taskId}/checkin/{cycleId}/undo")]
     public async Task<ActionResult<UndoCheckInResponse>> UndoCheckIn(Guid taskId, int cycleId)
         => (await _undo.HandleAsync(new UndoCheckInHandlerRequest(taskId, cycleId, GetCurrentUserId(), GetClientToday()))).ToActionResult();
+
+    // Recovery endpoint for tasks left in a "fake checked in" state — task
+    // marked checked but no backing cycle row. See RepairCheckInHandler.
+    [HttpPost("{taskId}/repair-checkin")]
+    public async Task<ActionResult<RepairCheckInResponse>> RepairCheckIn(Guid taskId)
+        => (await _repair.HandleAsync(new RepairCheckInRequest(taskId, GetCurrentUserId()))).ToActionResult();
 
     [HttpDelete("{taskId}/checkin-history/{cycleId}")]
     public async Task<IActionResult> DeleteLogCycle(Guid taskId, int cycleId)

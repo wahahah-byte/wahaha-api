@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO;
 using wahaha.API.Repositories.Interfaces;
@@ -33,6 +34,31 @@ public sealed class UndoCheckInHandler : IRequestHandler<UndoCheckInHandlerReque
 
     public async Task<HandlerResult<UndoCheckInResponse>> HandleAsync(UndoCheckInHandlerRequest req, CancellationToken ct = default)
     {
+        try
+        {
+            return await HandleCore(req, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            _logger.LogWarning("Undo on task {TaskId} cycle {CycleId} lost a concurrency race; treating as success", req.TaskId, req.CycleId);
+            var refreshedUser = await _userRepo.GetByIdAsync(req.UserId);
+            var refreshedTotal = await _txRepo.GetDailyEarnedBySourceTypeAsync(req.UserId, DateTime.UtcNow, SourceType.recurring_task);
+            return HandlerResult<UndoCheckInResponse>.Ok(new UndoCheckInResponse
+            {
+                NewBalance = refreshedUser?.CurrentBalance ?? 0,
+                RecurringDailyTotal = refreshedTotal,
+                StreakCount = 0,
+                LongestCount = 0,
+                BonusMultiplier = 1.0m,
+                PreviousDueDate = string.Empty,
+                PreviousLastCheckInDate = string.Empty,
+                PointsRefunded = 0,
+            });
+        }
+    }
+
+    private async Task<HandlerResult<UndoCheckInResponse>> HandleCore(UndoCheckInHandlerRequest req, CancellationToken ct)
+    {
         _logger.LogInformation("User {UserId} undoing check-in cycle {CycleId} on task {TaskId}", req.UserId, req.CycleId, req.TaskId);
 
         var task = await _taskRepo.GetByIdAsync(req.TaskId);
@@ -46,18 +72,40 @@ public sealed class UndoCheckInHandler : IRequestHandler<UndoCheckInHandlerReque
         if (cycle.CycleType != "checkin")
             return HandlerResult<UndoCheckInResponse>.BadRequest("This cycle is not a check-in and cannot be undone via this endpoint.");
 
-        // Compare against the latest CHECKIN cycle, not the latest cycle of
-        // any type — a counter quick-log ("log" cycleType) for the same day
-        // can land after the check-in and would otherwise lock the check-in
-        // out of being undone. Logs are independent records of progress
-        // toward the goal and don't need to be reversed when the check-in
-        // commitment is undone; they stay as historical counter values.
         var latestCheckin = await _cycleRepo.GetLatestCheckinByTaskIdAsync(req.TaskId);
-        if (latestCheckin == null || latestCheckin.CycleId != cycle.CycleId)
-            return HandlerResult<UndoCheckInResponse>.BadRequest("Only the most recent check-in can be undone.");
+        if (latestCheckin == null)
+            return HandlerResult<UndoCheckInResponse>.BadRequest("No check-in cycle to undo.");
+        
+        if (latestCheckin.CycleId != cycle.CycleId)
+        {
+            cycle = latestCheckin;
+        }
 
         if (cycle.CheckInDate.Date != req.ClientToday.Date)
+        {
+  
+            if (task.LastCheckInDate?.Date == req.ClientToday.Date)
+            {
+                _logger.LogWarning(
+                    "Task {TaskId} in inconsistent state: LastCheckInDate={LastCheckInDate} is today but latest cycle {CycleId} is dated {CycleDate}. Repairing task state.",
+                    req.TaskId, task.LastCheckInDate, cycle.CycleId, cycle.CheckInDate);
+                await _taskRepo.SetCycleStateAsync(req.TaskId, cycle.PreviousDueDate, cycle.PreviousLastCheckInDate);
+                var repairedUser = await _userRepo.GetByIdAsync(req.UserId);
+                var repairedTotal = await _txRepo.GetDailyEarnedBySourceTypeAsync(req.UserId, DateTime.UtcNow, SourceType.recurring_task);
+                return HandlerResult<UndoCheckInResponse>.Ok(new UndoCheckInResponse
+                {
+                    NewBalance = repairedUser?.CurrentBalance ?? 0,
+                    RecurringDailyTotal = repairedTotal,
+                    StreakCount = 0,
+                    LongestCount = 0,
+                    BonusMultiplier = 1.0m,
+                    PreviousDueDate = cycle.PreviousDueDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+                    PreviousLastCheckInDate = cycle.PreviousLastCheckInDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+                    PointsRefunded = 0,
+                });
+            }
             return HandlerResult<UndoCheckInResponse>.BadRequest("Check-ins can only be undone on the same day they were made.");
+        }
 
         var pointsRefunded = cycle.PointsAwarded ?? 0;
         if (cycle.PointTransactionId.HasValue)
@@ -66,19 +114,23 @@ public sealed class UndoCheckInHandler : IRequestHandler<UndoCheckInHandlerReque
             await _userRepo.RefundPointsAsync(req.UserId, pointsRefunded);
 
         var streak = await _streakRepo.GetByTaskIdAsync(req.TaskId);
+        var restoredCount = cycle.PreviousStreakCount ?? 0;
+        var restoredLongest = cycle.PreviousLongestCount ?? streak?.LongestCount ?? 0;
+        var restoredLastActivity = cycle.PreviousStreakLastActivity ?? streak?.LastActivityDate ?? DateTime.UtcNow;
+        var restoredIsActive = cycle.PreviousStreakIsActive ?? streak?.IsActive ?? true;
+        var restoredMultiplier = cycle.PreviousStreakBonusMultiplier ?? streak?.BonusMultiplier ?? 1.0m;
         if (streak != null)
         {
-            streak.CurrentCount = cycle.PreviousStreakCount ?? 0;
-            streak.LongestCount = cycle.PreviousLongestCount ?? streak.LongestCount;
-            streak.LastActivityDate = cycle.PreviousStreakLastActivity ?? streak.LastActivityDate;
-            streak.IsActive = cycle.PreviousStreakIsActive ?? streak.IsActive;
-            streak.BonusMultiplier = cycle.PreviousStreakBonusMultiplier ?? streak.BonusMultiplier;
-            await _streakRepo.UpdateAsync(streak);
+            await _streakRepo.RestoreAsync(
+                streak.StreakId,
+                restoredCount,
+                restoredLongest,
+                restoredLastActivity,
+                restoredIsActive,
+                restoredMultiplier);
         }
 
-        task.DueDate = cycle.PreviousDueDate;
-        task.LastCheckInDate = cycle.PreviousLastCheckInDate;
-        await _taskRepo.UpdateAsync(task);
+        await _taskRepo.SetCycleStateAsync(req.TaskId, cycle.PreviousDueDate, cycle.PreviousLastCheckInDate);
 
         await _cycleRepo.DeleteAsync(cycle.CycleId);
 
@@ -86,15 +138,15 @@ public sealed class UndoCheckInHandler : IRequestHandler<UndoCheckInHandlerReque
         var newRecurringTotal = await _txRepo.GetDailyEarnedBySourceTypeAsync(req.UserId, DateTime.UtcNow, SourceType.recurring_task);
 
         _logger.LogInformation("Check-in cycle {CycleId} undone: refunded {Points} pts, streak restored to {Count}",
-            req.CycleId, pointsRefunded, streak?.CurrentCount);
+            req.CycleId, pointsRefunded, restoredCount);
 
         return HandlerResult<UndoCheckInResponse>.Ok(new UndoCheckInResponse
         {
             NewBalance = user?.CurrentBalance ?? 0,
             RecurringDailyTotal = newRecurringTotal,
-            StreakCount = streak?.CurrentCount ?? 0,
-            LongestCount = streak?.LongestCount ?? 0,
-            BonusMultiplier = streak?.BonusMultiplier ?? 1.0m,
+            StreakCount = restoredCount,
+            LongestCount = restoredLongest,
+            BonusMultiplier = restoredMultiplier,
             PreviousDueDate = cycle.PreviousDueDate?.ToString("yyyy-MM-dd") ?? string.Empty,
             PreviousLastCheckInDate = cycle.PreviousLastCheckInDate?.ToString("yyyy-MM-dd") ?? string.Empty,
             PointsRefunded = pointsRefunded,

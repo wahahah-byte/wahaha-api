@@ -32,10 +32,6 @@ public sealed class LogCounterHandler : IRequestHandler<LogCounterRequest, Check
         if (!request.Request.CounterValue.HasValue)
             return HandlerResult<CheckInCycleDto>.BadRequest("Counter value is required.");
 
-        // Once this cycle's check-in is committed the cycle is closed.
-        // `>=` (not `>`) — for daily tasks the check-in's LastCheckInDate ==
-        // cycleStart (both = today), and a strict-greater check let
-        // same-day logs slip through after the user had already checked in.
         if (task.LastCheckInDate.HasValue && task.DueDate.HasValue)
         {
             var cycleStart = TaskCycleHelpers.GetCycleStart(task.DueDate.Value.Date, task.RecurrenceRule);

@@ -11,6 +11,10 @@ public interface IStreakRepository : IRepository<Streak, int>
     Task<PagedResult<Streak>> GetFilteredAsync(StreakFilterParams filters);
     Task<bool> IncrementAsync(int id, DateTime? activityDate = null);
     Task<bool> ResetAsync(int id);
+    // Atomic restore for the undo flow — sets every mutable field at once
+    // via ExecuteUpdateAsync so a concurrent check-in increment doesn't
+    // throw DbUpdateConcurrencyException on the load-modify-save pattern.
+    Task<bool> RestoreAsync(int id, int currentCount, int longestCount, DateTime lastActivityDate, bool isActive, decimal bonusMultiplier);
     Task<Streak?> GetByTaskIdAsync(Guid taskId);
     Task<int> DeleteByTaskIdAsync(Guid taskId);
 }

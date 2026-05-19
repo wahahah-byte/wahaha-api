@@ -35,6 +35,7 @@ public static class HandlerRegistration
         services.AddScoped<IRequestHandler<AvatarItems.ToggleAvatarItemAvailabilityRequest, Unit>, AvatarItems.ToggleAvatarItemAvailabilityHandler>();
         services.AddScoped<IRequestHandler<AvatarItems.RecomputeAvatarItemBoundsRequest, AvatarItemDto>, AvatarItems.RecomputeAvatarItemBoundsHandler>();
         services.AddScoped<IRequestHandler<AvatarItems.GrantAvatarItemRequest, UserInventoryDto>, AvatarItems.GrantAvatarItemHandler>();
+        services.AddScoped<IRequestHandler<AvatarItems.PurchaseAvatarItemRequest, PurchaseAvatarItemResponseDto>, AvatarItems.PurchaseAvatarItemHandler>();
         services.AddScoped<IRequestHandler<AvatarItems.DeleteAvatarItemRequest, Unit>, AvatarItems.DeleteAvatarItemHandler>();
 
         // Minigames
@@ -97,6 +98,7 @@ public static class HandlerRegistration
         services.AddScoped<IRequestHandler<Tasks.LogCounterRequest, CheckInCycleDto>, Tasks.LogCounterHandler>();
         services.AddScoped<IRequestHandler<Tasks.UpdateCheckInCycleRequest, Unit>, Tasks.UpdateCheckInCycleHandler>();
         services.AddScoped<IRequestHandler<Tasks.UndoCheckInHandlerRequest, UndoCheckInResponse>, Tasks.UndoCheckInHandler>();
+        services.AddScoped<IRequestHandler<Tasks.RepairCheckInRequest, Tasks.RepairCheckInResponse>, Tasks.RepairCheckInHandler>();
         services.AddScoped<IRequestHandler<Tasks.DeleteLogCycleRequest, Unit>, Tasks.DeleteLogCycleHandler>();
         services.AddScoped<IRequestHandler<Tasks.DeleteTaskRequest, Unit>, Tasks.DeleteTaskHandler>();
 

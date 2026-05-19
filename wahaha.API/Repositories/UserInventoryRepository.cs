@@ -127,4 +127,9 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
         _logger.LogInformation("Inventory item {InventoryId} unequipped successfully", id);
         return true;
     }
+
+    public async Task<bool> UserOwnsItemAsync(Guid userId, int itemId)
+    {
+        return await _dbSet.AnyAsync(i => i.UserId == userId && i.ItemId == itemId);
+    }
 }

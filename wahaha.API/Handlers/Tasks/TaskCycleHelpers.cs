@@ -2,11 +2,6 @@ namespace wahaha.API.Handlers.Tasks;
 
 internal static class TaskCycleHelpers
 {
-    /// <summary>
-    /// Start of the cycle containing <paramref name="dueDate"/> for the given
-    /// recurrence rule. Cycles run (cycleStart, dueDate]; LastCheckInDate is
-    /// inside this range iff the user has already checked in this cycle.
-    /// </summary>
     public static DateTime GetCycleStart(DateTime dueDate, string? rule)
     {
         var d = dueDate.Date;

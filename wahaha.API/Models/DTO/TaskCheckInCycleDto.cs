@@ -8,6 +8,11 @@ public class CheckInCycleDto
     public int? CounterValue { get; set; }
     public DateTime CreatedAt { get; set; }
     public string CycleType { get; set; } = "checkin";
+    // Snapshot of task.DueDate from BEFORE this check-in advanced it. Lets
+    // the client restore the precise pre-checkin overdue state on undo for
+    // cycles loaded from a previous session (preCheckinDueDateRef only
+    // covers same-session check-ins).
+    public DateTime? PreviousDueDate { get; set; }
 }
 
 public class CheckInRequest

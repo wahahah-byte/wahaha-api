@@ -55,7 +55,15 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         {
             var uid = filters.UserId.Value;
             query = _dbSet
-                .Include(t => t.Streaks.Where(s => s.UserId == uid && s.IsActive))
+                // Include ALL streaks for this user (active or not). Filtering
+                // by IsActive at the include level caused the tier badge to
+                // vanish after an undo that restored a streak to its
+                // pre-reset state (IsActive=false): GetTaskList saw no
+                // Streaks entry, left dto.CurrentStreakCount=null, and the
+                // client rendered no badge until something else repopulated
+                // the value. The CurrentCount itself is still meaningful
+                // even when the streak is dormant.
+                .Include(t => t.Streaks.Where(s => s.UserId == uid))
                 .Include(t => t.Subtasks)
                 .Include(t => t.CheckInCycles
                     .OrderByDescending(c => c.CheckInDate)
@@ -162,6 +170,35 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
 
         await _context.SaveChangesAsync();
         _logger.LogInformation("Task {TaskId} completed successfully", id);
+        return true;
+    }
+
+    public async Task<bool> SetCycleStateAsync(Guid id, DateTime? dueDate, DateTime? lastCheckInDate)
+    {
+        // Atomic cycle-state setter for the undo flow. Was previously a
+        // load-modify-UpdateAsync that raced against concurrent check-in
+        // writes (CheckInTask's task update via change tracker) in separate
+        // DbContexts — slower one threw DbUpdateConcurrencyException.
+        // ExecuteUpdateAsync row-locks server-side so concurrent undo + check-in
+        // serialize cleanly. Submitted is intentionally left untouched —
+        // the previous load-modify-save pattern didn't explicitly write it
+        // either, so existing semantics are preserved.
+        var rowsAffected = await _dbSet
+            .Where(t => t.TaskId == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(t => t.DueDate, dueDate)
+                .SetProperty(t => t.LastCheckInDate, lastCheckInDate));
+        if (rowsAffected == 0)
+        {
+            _logger.LogWarning("Task {TaskId} not found for cycle-state update", id);
+            return false;
+        }
+        // Detach stale tracked copies so a follow-up read in the same context
+        // sees the freshly-written values (mirrors Streak/Subtask repos).
+        foreach (var entry in _context.ChangeTracker.Entries<Models.Domain.Task>().ToList())
+        {
+            if (entry.Entity.TaskId == id) entry.State = EntityState.Detached;
+        }
         return true;
     }
 

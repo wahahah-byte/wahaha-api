@@ -72,39 +72,45 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
 
     public async Task<bool> AddPointsAsync(Guid id, int points)
     {
+        // Atomic increment via ExecuteUpdateAsync. The previous load-modify-save
+        // pattern raced against concurrent point mutations (e.g. rapid
+        // check-in + undo both touching the same user row in separate
+        // DbContexts) and threw DbUpdateConcurrencyException on the slower
+        // SaveChanges. ExecuteUpdateAsync serializes at the DB row-lock
+        // level and bypasses the change tracker entirely.
         _logger.LogInformation("Adding {Points} points to user {UserId}", points, id);
-        var user = await _dbSet.FindAsync(id);
-        if (user == null)
-        {
-            _logger.LogWarning("User {UserId} not found when adding points", id);
-            return false;
-        }
-
-        user.CurrentBalance += points;
-        user.TotalPointsEarned += points;
-        await _context.SaveChangesAsync();
+        var rowsAffected = await _dbSet
+            .Where(u => u.UserId == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(u => u.CurrentBalance, u => u.CurrentBalance + points)
+                .SetProperty(u => u.TotalPointsEarned, u => u.TotalPointsEarned + points));
+        if (rowsAffected == 0) { _logger.LogWarning("User {UserId} not found when adding points", id); return false; }
+        DetachUser(id);
         return true;
     }
 
     public async Task<bool> SpendPointsAsync(Guid id, int points)
     {
+        // Atomic conditional decrement — the WHERE filter doubles as the
+        // balance check, so a concurrent spend can't drive the balance
+        // negative even though both transactions see "enough balance" at
+        // load time. 0 rows affected here can mean "user not found" OR
+        // "insufficient balance"; the follow-up FindAsync teases the two
+        // apart so the caller still gets the right log/return path.
         _logger.LogInformation("Spending {Points} points for user {UserId}", points, id);
-        var user = await _dbSet.FindAsync(id);
-        if (user == null)
+        var rowsAffected = await _dbSet
+            .Where(u => u.UserId == id && u.CurrentBalance >= points)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(u => u.CurrentBalance, u => u.CurrentBalance - points));
+        if (rowsAffected == 0)
         {
-            _logger.LogWarning("User {UserId} not found when spending points", id);
-            return false;
-        }
-
-        if (user.CurrentBalance < points)
-        {
+            var existing = await _dbSet.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == id);
+            if (existing == null) { _logger.LogWarning("User {UserId} not found when spending points", id); return false; }
             _logger.LogWarning("User {UserId} has insufficient balance ({Balance}) to spend {Points} points",
-                id, user.CurrentBalance, points);
+                id, existing.CurrentBalance, points);
             return false;
         }
-
-        user.CurrentBalance -= points;
-        await _context.SaveChangesAsync();
+        DetachUser(id);
         return true;
     }
 
@@ -114,16 +120,25 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
     public async Task<bool> RefundPointsAsync(Guid id, int points)
     {
         _logger.LogInformation("Refunding {Points} points from user {UserId}", points, id);
-        var user = await _dbSet.FindAsync(id);
-        if (user == null)
-        {
-            _logger.LogWarning("User {UserId} not found when refunding points", id);
-            return false;
-        }
-
-        user.CurrentBalance -= points;
-        user.TotalPointsEarned -= points;
-        await _context.SaveChangesAsync();
+        var rowsAffected = await _dbSet
+            .Where(u => u.UserId == id)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(u => u.CurrentBalance, u => u.CurrentBalance - points)
+                .SetProperty(u => u.TotalPointsEarned, u => u.TotalPointsEarned - points));
+        if (rowsAffected == 0) { _logger.LogWarning("User {UserId} not found when refunding points", id); return false; }
+        DetachUser(id);
         return true;
+    }
+
+    // ExecuteUpdateAsync bypasses the change tracker, so any User entity
+    // loaded earlier in the same request (e.g. via GetByIdAsync above one of
+    // these point methods) still shows the OLD CurrentBalance. Detach so a
+    // follow-up read hits the DB and returns the freshly-updated row.
+    private void DetachUser(Guid id)
+    {
+        foreach (var entry in _context.ChangeTracker.Entries<Users>().ToList())
+        {
+            if (entry.Entity.UserId == id) entry.State = EntityState.Detached;
+        }
     }
 }
