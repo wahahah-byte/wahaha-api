@@ -59,10 +59,7 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
             .FirstOrDefaultAsync(u => u.Username == username);
     }
 
-    // Email match is case-insensitive at the DB layer (the email column
-    // collates as Latin1_General_CI_AS by default on SQL Server). Used by
-    // the admin grant-item endpoint to resolve a typed-in email to a
-    // domain Users row.
+    // Email match is case-insensitive at the DB layer (Latin1_General_CI_AS).
     public async Task<Users?> GetByEmailAsync(string email)
     {
         _logger.LogDebug("Fetching user by email {Email}", email);
@@ -72,12 +69,7 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
 
     public async Task<bool> AddPointsAsync(Guid id, int points)
     {
-        // Atomic increment via ExecuteUpdateAsync. The previous load-modify-save
-        // pattern raced against concurrent point mutations (e.g. rapid
-        // check-in + undo both touching the same user row in separate
-        // DbContexts) and threw DbUpdateConcurrencyException on the slower
-        // SaveChanges. ExecuteUpdateAsync serializes at the DB row-lock
-        // level and bypasses the change tracker entirely.
+        // Atomic increment via ExecuteUpdateAsync to serialize concurrent point mutations.
         _logger.LogInformation("Adding {Points} points to user {UserId}", points, id);
         var rowsAffected = await _dbSet
             .Where(u => u.UserId == id)
@@ -91,12 +83,7 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
 
     public async Task<bool> SpendPointsAsync(Guid id, int points)
     {
-        // Atomic conditional decrement — the WHERE filter doubles as the
-        // balance check, so a concurrent spend can't drive the balance
-        // negative even though both transactions see "enough balance" at
-        // load time. 0 rows affected here can mean "user not found" OR
-        // "insufficient balance"; the follow-up FindAsync teases the two
-        // apart so the caller still gets the right log/return path.
+        // Atomic conditional decrement; WHERE doubles as the balance guard.
         _logger.LogInformation("Spending {Points} points for user {UserId}", points, id);
         var rowsAffected = await _dbSet
             .Where(u => u.UserId == id && u.CurrentBalance >= points)
@@ -114,9 +101,7 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
         return true;
     }
 
-    // Reverses an earlier AddPointsAsync — typically when a check-in is undone.
-    // Allowed to drive CurrentBalance negative if the user already spent the
-    // awarded points; we trust the caller to have validated authorization.
+    // Reverse of AddPointsAsync; balance may go negative if user already spent the award.
     public async Task<bool> RefundPointsAsync(Guid id, int points)
     {
         _logger.LogInformation("Refunding {Points} points from user {UserId}", points, id);
@@ -130,10 +115,7 @@ public class UserRepository : Repository<Users, Guid>, IUserRepository
         return true;
     }
 
-    // ExecuteUpdateAsync bypasses the change tracker, so any User entity
-    // loaded earlier in the same request (e.g. via GetByIdAsync above one of
-    // these point methods) still shows the OLD CurrentBalance. Detach so a
-    // follow-up read hits the DB and returns the freshly-updated row.
+    // Detach tracked User so follow-up reads see post-ExecuteUpdate balance.
     private void DetachUser(Guid id)
     {
         foreach (var entry in _context.ChangeTracker.Entries<Users>().ToList())

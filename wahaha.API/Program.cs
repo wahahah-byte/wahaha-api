@@ -131,17 +131,11 @@ builder.Services.AddScoped<IUserInventoryRepository, UserInventoryRepository>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IBlobService, BlobService>();
 builder.Services.AddScoped<IContentBoundsService, ContentBoundsService>();
-// HttpClient — currently only used by the recompute-bounds endpoint to
-// fetch an item's PreviewAssetUrl when re-scanning its bbox. Registered as
-// IHttpClientFactory so each request gets a pooled HttpClient instead of
-// instantiating one (avoids socket exhaustion if the endpoint is hit at
-// volume).
+// IHttpClientFactory for pooled HttpClients (recompute-bounds endpoint).
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<ITaskPenaltyService, TaskPenaltyService>();
 
-// Request handlers — one per endpoint, registered via the extension method
-// in HandlerRegistration.cs. Add new handlers to that file when extending the
-// API surface.
+// Request handlers — one per endpoint; see HandlerRegistration.cs.
 builder.Services.AddRequestHandlers();
 
 builder.Services.AddHostedService<PenaltyJob>();
@@ -175,10 +169,7 @@ builder.Services.AddCors(options =>
 });
 var app = builder.Build();
 
-// Promote any users listed in Bootstrap:AdminEmail to the Admin role. Runs
-// every startup and is idempotent — users already in the role are skipped,
-// and missing users log a warning and no-op (no startup failure). See
-// AdminSeeder.cs for the full behaviour contract.
+// Promote Bootstrap:AdminEmail users to Admin role (idempotent).
 await wahaha.API.Data.AdminSeeder.SeedAdminsAsync(app.Services);
 
 app.UseCors("WahahaPolicy");

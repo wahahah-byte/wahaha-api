@@ -10,14 +10,7 @@ public class TaskCheckInCycleRepository : Repository<TaskCheckInCycle, int>, ITa
     public TaskCheckInCycleRepository(WahahaDbContext context, ILogger<TaskCheckInCycleRepository> logger)
         : base(context, logger) { }
 
-    // Atomic delete via ExecuteDeleteAsync — replaces the base Find+Remove+
-    // SaveChanges. Rapid check-in/undo cycles can produce two concurrent
-    // delete attempts on the same row (the "Only most recent" tolerance in
-    // UndoCheckIn re-targets stale undo requests to the actual latest cycle,
-    // so two undo flows can converge on the same cycle); the tracker-based
-    // delete throws DbUpdateConcurrencyException on the slower one because
-    // it sees "0 rows affected". ExecuteDeleteAsync is idempotent — returns
-    // 0 silently if the row is already gone, which is the desired outcome.
+    // Idempotent atomic delete via ExecuteDeleteAsync to survive concurrent undo races.
     public override async Task<bool> DeleteAsync(int id)
     {
         _logger.LogInformation("Deleting CheckIn cycle {CycleId}", id);

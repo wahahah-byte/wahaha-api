@@ -32,11 +32,7 @@ public sealed class GetTaskByIdHandler : IRequestHandler<GetTaskByIdRequest, Tas
         }
         var dto = _mapper.Map<TaskDto>(task);
         var streak = await _streakRepo.GetByTaskIdAsync(request.TaskId);
-        // Populate streak counts regardless of IsActive — a dormant streak
-        // still has a CurrentCount the client wants to show (and skipping
-        // it made the tier badge vanish after an undo that restored a
-        // streak to its pre-reset inactive state). Mirrors the equivalent
-        // change in TaskRepository.GetFilteredAsync.
+        // Populate streak counts regardless of IsActive so the tier badge survives undo.
         if (streak != null && streak.UserId == request.UserId)
         {
             dto.CurrentStreakCount = streak.CurrentCount;

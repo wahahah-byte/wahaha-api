@@ -13,8 +13,6 @@ public interface ITaskRepository : IRepository<Models.Domain.Task, Guid>
     Task<bool> CompleteAsync(Guid id);
     Task<bool> SetArchivedAsync(Guid id, bool isArchived);
     Task<int> AutoArchiveAsync(DateTime cutoffDate);
-    // Atomic setter for the cycle-rollback fields the undo flow needs.
-    // Replaces a load-modify-UpdateAsync that raced against concurrent
-    // check-in writes and threw DbUpdateConcurrencyException.
+    // Atomic cycle-rollback setter for the undo flow.
     Task<bool> SetCycleStateAsync(Guid id, DateTime? dueDate, DateTime? lastCheckInDate);
 }

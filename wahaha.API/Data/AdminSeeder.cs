@@ -3,27 +3,7 @@ using wahaha.API.Models.Auth;
 
 namespace wahaha.API.Data;
 
-// Runtime seeder that promotes one or more registered users to the Admin
-// role based on configuration. Replaces the manual SQL INSERT into
-// auth.AspNetUserRoles that was previously the only way to bootstrap an
-// admin (since /api/Auth/register hardcodes the User role and the
-// /api/Admin/assign-role endpoint is itself Admin-gated).
-//
-// Reads `Bootstrap:AdminEmail` from configuration — either a single email
-// or a comma-separated list:
-//
-//   "Bootstrap": { "AdminEmail": "alice@example.com,bob@example.com" }
-//
-// For each email: looks up the user via UserManager.FindByEmailAsync.
-//   - If the user doesn't exist (hasn't registered yet) → log warning, skip.
-//   - If the user is already in Admin → log info, skip (idempotent across
-//     restarts).
-//   - Otherwise → AddToRoleAsync. Additive only; never demotes a previously
-//     promoted account, even if that email is removed from the config later.
-//
-// Call this from Program.cs after app.Build() and before app.Run(). It
-// creates its own DI scope (same shape as the dead-code RoleSeeder next to
-// it) so it can resolve UserManager without polluting the request pipeline.
+// Runtime seeder that promotes users to Admin from Bootstrap:AdminEmail config (additive, idempotent).
 public static class AdminSeeder
 {
     public static async Task SeedAdminsAsync(IServiceProvider serviceProvider)

@@ -31,9 +31,7 @@ public class Subtask
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // Fitness extension. When SetsTarget is set, the subtask renders as an
-    // exercise row with a "X/Y" set counter. SetsCompleted increments per
-    // tap; the row auto-marks Completed when SetsCompleted reaches SetsTarget.
+    // Fitness extension: SetsTarget triggers an X/Y set counter; row auto-completes at target.
     [Column("sets_target")]
     public int? SetsTarget { get; set; }
 

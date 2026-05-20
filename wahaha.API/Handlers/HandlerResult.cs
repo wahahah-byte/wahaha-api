@@ -10,11 +10,7 @@ public enum HandlerStatus
     Conflict,
 }
 
-/// <summary>
-/// Transport-agnostic result a handler returns to its controller. The
-/// controller is responsible for translating this into an MVC
-/// <c>ActionResult</c> via <see cref="HandlerResultExtensions"/>.
-/// </summary>
+// Transport-agnostic handler result; controller maps to ActionResult via HandlerResultExtensions.
 public sealed class HandlerResult<T>
 {
     public HandlerStatus Status { get; }
@@ -36,10 +32,7 @@ public sealed class HandlerResult<T>
     public static HandlerResult<T> Conflict(string error) => new(HandlerStatus.Conflict, default, error);
 }
 
-/// <summary>
-/// Stand-in payload type for handlers that don't return data (PATCH/DELETE,
-/// usually paired with <see cref="HandlerStatus.NoContent"/>).
-/// </summary>
+// Empty payload for handlers that return no data (PATCH/DELETE).
 public sealed class Unit
 {
     public static readonly Unit Value = new();

@@ -66,15 +66,7 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
 
     public async Task<bool> IncrementAsync(int id, DateTime? activityDate = null)
     {
-        // Atomic SQL UPDATE. Previously this was load → modify in-memory →
-        // SaveChanges, which raced badly when the user rapid-tapped a
-        // check-in checkbox: two concurrent CheckInTask requests would each
-        // load the streak into their own DbContext, both modify, and the
-        // second SaveChanges threw DbUpdateConcurrencyException ("0 rows
-        // affected") because EF's tracker had a stale view. ExecuteUpdateAsync
-        // serializes at the DB row-lock level and bypasses the change
-        // tracker entirely, so concurrent increments now reliably each
-        // advance the count by 1.
+        // Atomic SQL UPDATE; row-level locks serialize concurrent rapid-tap increments.
         var date = activityDate ?? DateTime.UtcNow;
         _logger.LogInformation("Incrementing streak {StreakId}", id);
         var rowsAffected = await _dbSet
@@ -96,11 +88,7 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
             _logger.LogWarning("Streak {StreakId} not found for increment", id);
             return false;
         }
-        // ExecuteUpdateAsync bypasses the change tracker, so any Streak
-        // entity loaded earlier in the same request (e.g. via
-        // GetByTaskIdAsync above CheckInTask's IncrementAsync call) still
-        // shows the OLD column values. Detach so a follow-up GetByIdAsync
-        // hits the DB and returns the freshly-incremented row.
+        // Detach tracked streak so follow-up reads see post-ExecuteUpdate values.
         foreach (var entry in _context.ChangeTracker.Entries<Streak>().ToList())
         {
             if (entry.Entity.StreakId == id) entry.State = EntityState.Detached;
@@ -111,11 +99,7 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
 
     public async Task<bool> RestoreAsync(int id, int currentCount, int longestCount, DateTime lastActivityDate, bool isActive, decimal bonusMultiplier)
     {
-        // Atomic equivalent of UndoCheckIn's load-modify-UpdateAsync streak
-        // restore. The load-modify pattern raced against a concurrent
-        // check-in's IncrementAsync (both touched the same Streak row in
-        // separate DbContexts) and threw DbUpdateConcurrencyException on
-        // the slower one. ExecuteUpdateAsync serializes at the row level.
+        // Atomic streak restore for UndoCheckIn; row-locks against concurrent IncrementAsync.
         var rowsAffected = await _dbSet
             .Where(s => s.StreakId == id)
             .ExecuteUpdateAsync(setters => setters
@@ -125,9 +109,7 @@ public class StreakRepository : Repository<Streak, int>, IStreakRepository
                 .SetProperty(s => s.IsActive, isActive)
                 .SetProperty(s => s.BonusMultiplier, bonusMultiplier));
         if (rowsAffected == 0) return false;
-        // Detach stale tracked copies, mirroring IncrementAsync — keeps a
-        // follow-up read in the same DbContext from returning pre-restore
-        // column values.
+        // Detach tracked streak so follow-up reads see post-restore values.
         foreach (var entry in _context.ChangeTracker.Entries<Streak>().ToList())
         {
             if (entry.Entity.StreakId == id) entry.State = EntityState.Detached;

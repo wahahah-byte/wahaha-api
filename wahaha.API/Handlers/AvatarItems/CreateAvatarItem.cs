@@ -44,10 +44,7 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
                 _logger.LogWarning("Invalid image upload for avatar item {Name}", dto.Name);
                 return HandlerResult<AvatarItemDto>.BadRequest("Invalid image. Only JPG, PNG and WebP files under 5MB are allowed.");
             }
-            // Compute the content bbox first — ImageSharp reads the stream
-            // to EOF; IFormFile.OpenReadStream returns a fresh stream on
-            // each call, so the subsequent BlobService upload starts from
-            // byte 0 with no extra seeking.
+            // Compute bbox first; IFormFile.OpenReadStream gives a fresh stream for the upload.
             var bounds = await _boundsService.ComputeAsync(dto.Image, ct);
             if (bounds != null)
             {
@@ -56,10 +53,7 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
                 item.ContentMaxX = bounds.MaxX;
                 item.ContentMaxY = bounds.MaxY;
             }
-            // Predictable blob name — "{slot}_{slug(name)}.png" — so the
-            // stored URL is derivable from the item's metadata and the
-            // static demo / mock can stay aligned with reality. BlobService
-            // appends a "-2", "-3", … suffix if the slug is already taken.
+            // Predictable blob name "{slot}_{slug(name)}.png"; BlobService appends "-2" etc on collision.
             item.PreviewAssetUrl = await _blobService.UploadAsync(
                 dto.Image,
                 ContainerName,
@@ -67,10 +61,7 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
             _logger.LogInformation("Image uploaded for avatar item {Name}: {Url}", dto.Name, item.PreviewAssetUrl);
         }
 
-        // Secondary image — uploaded to the same container under a separate
-        // blob. No bbox scan (the secondary always renders at HAIR_BACK
-        // z-order behind the primary, where slot-default positioning is fine
-        // and the inventory card never shows it).
+        // Secondary image: separate blob in same container; no bbox scan.
         if (dto.SecondaryImage != null)
         {
             if (!IsValidImage(dto.SecondaryImage))
@@ -97,17 +88,11 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
         return allowedTypes.Contains(file.ContentType.ToLower()) && file.Length <= maxSize;
     }
 
-    // Compose the base name the blob will be stored as. BlobService runs the
-    // result through its own slug pass, so this only has to be human-readable
-    // — punctuation and casing are normalised downstream.
+    // BlobService slugifies downstream so input only needs to be human-readable.
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
 
-    // Semantic suffix for the secondary blob. Mirrors ChibiAvatar's
-    // slot-dependent z-order resolution:
-    //   HAIR_FRONT   primary = bangs    → secondary = "_back"  (back strands)
-    //   CAPE         primary = back     → secondary = "_front" (front drape)
-    //   WEAPON_FRONT primary = front    → secondary = "_back"  (shaft behind)
+    // Slot-dependent secondary suffix: CAPE = "_front" (front drape), else "_back".
     private static string SecondarySuffix(string slot)
         => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase) ? "_front" : "_back";
 }

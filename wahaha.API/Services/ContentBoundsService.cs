@@ -4,19 +4,10 @@ using wahaha.API.Services.Interfaces;
 
 namespace wahaha.API.Services;
 
-// Computes the tight bounding box of non-transparent pixels in an uploaded
-// image. Used by the avatar-item create / update handlers so the frontend
-// can centre the visible content of a PNG inside its inventory card without
-// hand-tuned per-item transform overrides.
-//
-// Thresholding: pixels with alpha greater than ALPHA_THRESHOLD count as
-// content. The default of 16 (out of 255) is lenient — it includes faint
-// antialiasing fringes so the bbox doesn't crop into soft edges. Bumping
-// this higher produces tighter crops but can shave off legitimate pixels.
+// Computes tight bbox of non-transparent pixels (alpha > AlphaThreshold).
 public class ContentBoundsService : IContentBoundsService
 {
-    // 16/255 ≈ 6%. Anything below this is treated as transparent for bbox
-    // purposes. Calibrated empirically against the existing avatar PNGs.
+    // 16/255 ≈ 6% alpha cutoff; lenient to preserve AA fringes.
     private const int AlphaThreshold = 16;
 
     private readonly ILogger<ContentBoundsService> _logger;
@@ -40,9 +31,7 @@ public class ContentBoundsService : IContentBoundsService
 
             int minX = image.Width, minY = image.Height, maxX = -1, maxY = -1;
 
-            // Row-major scan. ImageSharp's ProcessPixelRows hands back a
-            // span per row which lets us scan in tight bounds without the
-            // per-pixel allocations of GetPixel/SetPixel.
+            // Row-major span scan via ProcessPixelRows (no per-pixel allocations).
             image.ProcessPixelRows(accessor =>
             {
                 for (int y = 0; y < accessor.Height; y++)
@@ -61,9 +50,7 @@ public class ContentBoundsService : IContentBoundsService
                 }
             });
 
-            // Fully transparent / unreadable image — no content to centre.
-            // Caller stores null bounds and the client falls back to the
-            // slot defaults.
+            // No opaque pixels found; caller stores null bounds (slot defaults).
             if (maxX < 0 || maxY < 0)
             {
                 _logger.LogWarning(
@@ -80,9 +67,7 @@ public class ContentBoundsService : IContentBoundsService
         }
         catch (Exception ex)
         {
-            // Don't fail the upload — bbox is an enhancement; missing it
-            // just means we fall back to slot defaults. Log enough info to
-            // diagnose later (corrupt PNGs, unsupported formats, etc.).
+            // Bbox failure shouldn't fail the upload; null falls back to slot defaults.
             _logger.LogWarning(ex,
                 "ContentBoundsService: failed to compute bounds for {Source}",
                 sourceLabel);

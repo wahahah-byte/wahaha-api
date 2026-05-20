@@ -4,12 +4,7 @@ namespace wahaha.API.Handlers;
 
 public static class HandlerResultExtensions
 {
-    /// <summary>
-    /// Translates a <see cref="HandlerResult{T}"/> into an MVC
-    /// <c>ActionResult</c>. Callers that need <c>CreatedAtAction</c> (with a
-    /// Location header) should handle the OK case themselves and only fall
-    /// through to this for the error branches.
-    /// </summary>
+    // Translate HandlerResult into an ActionResult (callers needing CreatedAtAction handle Ok themselves).
     public static ActionResult ToActionResult<T>(this HandlerResult<T> result)
         => result.Status switch
         {

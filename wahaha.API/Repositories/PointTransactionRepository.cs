@@ -12,12 +12,7 @@ public class PointTransactionRepository : Repository<PointTransaction, int>, IPo
     public PointTransactionRepository(WahahaDbContext context, ILogger<PointTransactionRepository> logger)
         : base(context, logger) { }
 
-    // Atomic delete via ExecuteDeleteAsync — same rationale as
-    // TaskCheckInCycleRepository.DeleteAsync. Concurrent undo flows can both
-    // attempt to delete the same PointTransaction (the cycle they're each
-    // undoing has the same PointTransactionId after the latest-cycle swap);
-    // the tracker-based delete throws DbUpdateConcurrencyException on the
-    // slower one, while ExecuteDeleteAsync is idempotent.
+    // Idempotent atomic delete via ExecuteDeleteAsync to survive concurrent undo races.
     public override async Task<bool> DeleteAsync(int id)
     {
         _logger.LogInformation("Deleting PointTransaction {TransactionId}", id);
@@ -85,9 +80,7 @@ public class PointTransactionRepository : Repository<PointTransaction, int>, IPo
             .SumAsync(pt => pt.Amount);
     }
 
-    // CheckInTask needs both the source-type total AND the per-category total
-    // to enforce the daily caps. Compute both in one query so the handler
-    // doesn't pay two round trips for what is essentially the same scan.
+    // One-query combined source-type + per-category totals for the daily-cap check.
     public async Task<(int BySourceType, int InCategory)> GetDailyEarnedTotalsAsync(
         Guid userId, DateTime utcDate, SourceType sourceType, string category)
     {

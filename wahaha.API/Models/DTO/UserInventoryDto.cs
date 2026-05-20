@@ -9,9 +9,7 @@ public class UserInventoryDto
     public bool IsEquipped { get; set; }
     public int? PositionX { get; set; }
     public int? PositionY { get; set; }
-    // Mobile-shape (5×7) placement. Stored separately from PositionX/Y so
-    // the desktop (7×5) and mobile (5×7) layouts can each persist without
-    // overwriting the other.
+    // Mobile-shape (5×7) placement, stored separately from desktop PositionX/Y.
     public int? PositionXMobile { get; set; }
     public int? PositionYMobile { get; set; }
     public bool IsRotated { get; set; }
@@ -25,13 +23,7 @@ public class CreateUserInventoryDto
     public bool IsEquipped { get; set; } = false;
 }
 
-// Sent to PATCH /api/UserInventory/{id}/position to relocate a single item.
-// Null values clear the position (item drops back into auto-placement).
-// IsRotated is optional — only applied when present in the payload, so the
-// existing position-only callers keep working untouched.
-// Layout selects which placement pair to update: "desktop" (default) writes
-// PositionX/Y, "mobile" writes PositionXMobile/YMobile. The field is
-// optional and defaults to desktop so existing callers keep working.
+// PATCH /api/UserInventory/{id}/position body; null clears, Layout selects desktop/mobile pair.
 public class UpdateInventoryPositionDto
 {
     public int? PositionX { get; set; }

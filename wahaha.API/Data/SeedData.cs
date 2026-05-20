@@ -16,9 +16,7 @@ public static class SeedData
         SeedStreaks(modelBuilder);
     }
 
-    // -------------------------------------------------------
     // Avatar Items
-    // -------------------------------------------------------
     private static void SeedAvatarItems(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AvatarItem>().HasData(
@@ -40,9 +38,7 @@ public static class SeedData
         );
     }
 
-    // -------------------------------------------------------
     // Minigames
-    // -------------------------------------------------------
     private static void SeedMinigames(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Minigame>().HasData(
@@ -57,9 +53,7 @@ public static class SeedData
         );
     }
 
-    // -------------------------------------------------------
-    // Users — emails follow username+test@wahaha.com format
-    // -------------------------------------------------------
+    // Users (emails follow username+test@wahaha.com format)
     private static readonly Guid User1Id = new("ea80e4bc-017d-4729-99d3-29ad8a5d9b47"); // DailyDragon
     private static readonly Guid User2Id = new("9e8e1aa6-273c-48c3-8634-56b630d6f3e3"); // QuestKnight
     private static readonly Guid User3Id = new("d5b63d3e-6049-44ed-92df-69560148f8a3"); // ShadowFox
@@ -79,9 +73,7 @@ public static class SeedData
         );
     }
 
-    // -------------------------------------------------------
     // User Inventory
-    // -------------------------------------------------------
     private static void SeedUserInventory(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserInventory>().HasData(
@@ -108,9 +100,7 @@ public static class SeedData
         );
     }
 
-    // -------------------------------------------------------
     // Tasks
-    // -------------------------------------------------------
     private static void SeedTasks(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Models.Domain.Task>().HasData(
@@ -125,9 +115,7 @@ public static class SeedData
         );
     }
 
-    // -------------------------------------------------------
     // Point Transactions
-    // -------------------------------------------------------
     private static void SeedPointTransactions(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<PointTransaction>().HasData(
@@ -147,9 +135,7 @@ public static class SeedData
         );
     }
 
-    // -------------------------------------------------------
     // Streaks
-    // -------------------------------------------------------
     private static void SeedStreaks(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Streak>().HasData(

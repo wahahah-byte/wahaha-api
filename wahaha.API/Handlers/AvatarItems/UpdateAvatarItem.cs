@@ -52,10 +52,7 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             }
             if (!string.IsNullOrEmpty(item.PreviewAssetUrl))
                 await _blobService.DeleteAsync(item.PreviewAssetUrl, ContainerName);
-            // Compute the bbox of the new image before uploading. Stored
-            // here directly on the entity; AutoMapper.Mapper below copies
-            // the rest of the DTO's metadata changes without touching these
-            // bounds (the source UpdateAvatarItemDto has no bbox fields).
+            // Compute new image bbox before upload; mapper won't touch these fields.
             var bounds = await _boundsService.ComputeAsync(request.Dto.Image, ct);
             if (bounds != null)
             {
@@ -66,18 +63,13 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             }
             else
             {
-                // Image accepted but bbox couldn't be derived (transparent,
-                // corrupt, etc.) — clear stale bounds so the client falls
-                // back to slot defaults rather than rendering the previous
-                // image's bbox over the new image.
+                // Bbox underivable — clear stale bounds so client falls back to slot defaults.
                 item.ContentMinX = null;
                 item.ContentMinY = null;
                 item.ContentMaxX = null;
                 item.ContentMaxY = null;
             }
-            // Use the incoming DTO's slot/name so a rename-and-reupload picks
-            // up the new slug; the existing blob was already deleted above
-            // so the collision-resolver won't shoulder-bump against it.
+            // Use DTO slot/name so rename-and-reupload picks up the new slug.
             item.PreviewAssetUrl = await _blobService.UploadAsync(
                 request.Dto.Image,
                 ContainerName,
@@ -85,11 +77,7 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             _logger.LogInformation("Image updated for avatar item {ItemId}: {Url}", request.ItemId, item.PreviewAssetUrl);
         }
 
-        // Secondary image — same drop-old + upload-new dance, but no bbox
-        // scan since the secondary renders at HAIR_BACK z behind the primary
-        // and the inventory card never displays it. Sending no secondary
-        // image leaves the existing SecondaryAssetUrl untouched (use the
-        // dedicated clear endpoint if you need to remove it entirely).
+        // Secondary image: drop-old + upload-new; no bbox scan; missing image leaves URL untouched.
         if (request.Dto.SecondaryImage != null)
         {
             if (!IsValidImage(request.Dto.SecondaryImage))
@@ -119,14 +107,11 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
         return allowedTypes.Contains(file.ContentType.ToLower()) && file.Length <= maxSize;
     }
 
-    // Mirror of CreateAvatarItemHandler's helper. BlobService slugifies the
-    // result so this can stay loose ("HAT_Alien Helmet" → hat_alien_helmet).
+    // BlobService slugifies the result so input can stay loose.
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
 
-    // CAPE secondary = front drape; HAIR_FRONT and WEAPON_FRONT secondaries
-    // = back. Mirrors CreateAvatarItemHandler.SecondarySuffix and
-    // ChibiAvatar's z-order resolution.
+    // CAPE secondary = front drape; HAIR_FRONT and WEAPON_FRONT secondaries = back.
     private static string SecondarySuffix(string slot)
         => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase) ? "_front" : "_back";
 }

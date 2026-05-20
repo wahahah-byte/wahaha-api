@@ -151,8 +151,7 @@ public class TasksController : ControllerBase
     public async Task<ActionResult<UndoCheckInResponse>> UndoCheckIn(Guid taskId, int cycleId)
         => (await _undo.HandleAsync(new UndoCheckInHandlerRequest(taskId, cycleId, GetCurrentUserId(), GetClientToday()))).ToActionResult();
 
-    // Recovery endpoint for tasks left in a "fake checked in" state — task
-    // marked checked but no backing cycle row. See RepairCheckInHandler.
+    // Recovery endpoint for tasks marked checked but missing a backing cycle row.
     [HttpPost("{taskId}/repair-checkin")]
     public async Task<ActionResult<RepairCheckInResponse>> RepairCheckIn(Guid taskId)
         => (await _repair.HandleAsync(new RepairCheckInRequest(taskId, GetCurrentUserId()))).ToActionResult();

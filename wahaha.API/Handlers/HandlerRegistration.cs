@@ -6,11 +6,7 @@ using wahaha.API.Models.Pagination;
 
 namespace wahaha.API.Handlers;
 
-/// <summary>
-/// One <c>AddScoped&lt;IRequestHandler&lt;Req, Res&gt;, Handler&gt;()</c> per
-/// endpoint. Grouped by feature for readability — when adding a new endpoint,
-/// drop the registration into the matching block.
-/// </summary>
+// One AddScoped<IRequestHandler<Req, Res>, Handler>() per endpoint, grouped by feature.
 public static class HandlerRegistration
 {
     public static IServiceCollection AddRequestHandlers(this IServiceCollection services)

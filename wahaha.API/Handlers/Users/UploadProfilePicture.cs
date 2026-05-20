@@ -41,8 +41,7 @@ public sealed class UploadProfilePictureHandler : IRequestHandler<UploadProfileP
         var user = await _repo.GetByIdAsync(request.UserId);
         if (user == null) return HandlerResult<UserDto>.NotFound("User was not found.");
 
-        // Better to leak an old blob on failure than to delete first and end up
-        // with no picture if the upload fails.
+        // Upload first then delete old blob: leaking on failure beats losing the picture.
         var previousUrl = user.ProfilePictureUrl;
 
         var url = await _blobService.UploadAsync(file, ProfilePictureContainer);

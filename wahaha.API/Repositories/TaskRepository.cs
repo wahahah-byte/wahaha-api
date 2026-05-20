@@ -9,9 +9,7 @@ namespace wahaha.API.Repositories;
 
 public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskRepository
 {
-    // Top N most-recent check-in cycles included with each Task so the detail modal
-    // has counter history available on first paint without a follow-up fetch, and
-    // the heatmap strip can render a full 14-day window for daily/weekdays tasks.
+    // Recent check-in cycles included per Task for detail modal + heatmap strip.
     private const int RecentCyclesPreviewCount = 14;
 
     public TaskRepository(WahahaDbContext context, ILogger<TaskRepository> logger)
@@ -55,14 +53,7 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         {
             var uid = filters.UserId.Value;
             query = _dbSet
-                // Include ALL streaks for this user (active or not). Filtering
-                // by IsActive at the include level caused the tier badge to
-                // vanish after an undo that restored a streak to its
-                // pre-reset state (IsActive=false): GetTaskList saw no
-                // Streaks entry, left dto.CurrentStreakCount=null, and the
-                // client rendered no badge until something else repopulated
-                // the value. The CurrentCount itself is still meaningful
-                // even when the streak is dormant.
+                // Include ALL streaks (active or not) so the tier badge survives undo.
                 .Include(t => t.Streaks.Where(s => s.UserId == uid))
                 .Include(t => t.Subtasks)
                 .Include(t => t.CheckInCycles
@@ -91,7 +82,7 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
         if (filters.IsRecurring.HasValue)
             query = query.Where(t => t.IsRecurring == filters.IsRecurring.Value);
 
-        // Default: exclude archived unless caller explicitly opts in (or asks for archived only).
+        // Exclude archived by default unless caller explicitly opts in.
         var archivedFilter = filters.IsArchived ?? false;
         query = query.Where(t => t.IsArchived == archivedFilter);
 
@@ -175,14 +166,7 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
 
     public async Task<bool> SetCycleStateAsync(Guid id, DateTime? dueDate, DateTime? lastCheckInDate)
     {
-        // Atomic cycle-state setter for the undo flow. Was previously a
-        // load-modify-UpdateAsync that raced against concurrent check-in
-        // writes (CheckInTask's task update via change tracker) in separate
-        // DbContexts — slower one threw DbUpdateConcurrencyException.
-        // ExecuteUpdateAsync row-locks server-side so concurrent undo + check-in
-        // serialize cleanly. Submitted is intentionally left untouched —
-        // the previous load-modify-save pattern didn't explicitly write it
-        // either, so existing semantics are preserved.
+        // Atomic cycle-state setter via ExecuteUpdateAsync; serializes undo vs check-in cleanly.
         var rowsAffected = await _dbSet
             .Where(t => t.TaskId == id)
             .ExecuteUpdateAsync(setters => setters
@@ -193,8 +177,7 @@ public class TaskRepository : Repository<Models.Domain.Task, Guid>, ITaskReposit
             _logger.LogWarning("Task {TaskId} not found for cycle-state update", id);
             return false;
         }
-        // Detach stale tracked copies so a follow-up read in the same context
-        // sees the freshly-written values (mirrors Streak/Subtask repos).
+        // Detach stale tracked copies so follow-up reads see fresh values.
         foreach (var entry in _context.ChangeTracker.Entries<Models.Domain.Task>().ToList())
         {
             if (entry.Entity.TaskId == id) entry.State = EntityState.Detached;

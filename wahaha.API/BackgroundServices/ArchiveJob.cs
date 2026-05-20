@@ -2,12 +2,7 @@ using wahaha.API.Repositories.Interfaces;
 
 namespace wahaha.API.BackgroundServices;
 
-/// <summary>
-/// Sweeps completed tasks older than the configured retention window and flips their
-/// IsArchived flag. Runs once at startup, then every 24 hours. Uses UTC date as the
-/// cutoff (no client timezone available in a server-side job); a user opening the app
-/// just won't see the most-recent edge-case rollover until the next tick.
-/// </summary>
+// Sweeps completed tasks older than retention window; runs every 24h on UTC date cutoff.
 public class ArchiveJob : BackgroundService
 {
     private readonly IServiceProvider _services;

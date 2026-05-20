@@ -40,9 +40,7 @@ public class Users
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // Public URL for the user's uploaded profile picture (Azure Blob).
-    // Null when the user hasn't uploaded one — the client falls back to
-    // a default avatar in that case.
+    // Public Azure Blob URL for the profile picture; null = client uses default avatar.
     [MaxLength(500)]
     [Column("profile_picture_url")]
     public string? ProfilePictureUrl { get; set; }

@@ -55,8 +55,7 @@ public sealed class RegisterAvatarItemByUrlHandler : IRequestHandler<RegisterAva
             PreviewAssetUrl = dto.PreviewAssetUrl,
             SecondaryAssetUrl = string.IsNullOrWhiteSpace(dto.SecondaryAssetUrl) ? null : dto.SecondaryAssetUrl,
             IsAvailable = dto.IsAvailable,
-            // Pass through optional render hints. Null = use slot defaults
-            // on the client.
+            // Optional render hints; null = use slot defaults client-side.
             CoversHairFront = dto.CoversHairFront,
             CoversHairBack = dto.CoversHairBack,
             OffsetX = dto.OffsetX,
@@ -66,14 +65,7 @@ public sealed class RegisterAvatarItemByUrlHandler : IRequestHandler<RegisterAva
             SourceHeight = dto.SourceHeight,
         };
 
-        // Auto-compute the content bbox at register time so the inventory
-        // card auto-centres without the admin having to click Recenter
-        // afterwards. Only works for absolute http(s) URLs (the same shape
-        // the recompute-bounds endpoint accepts); relative seed paths and
-        // non-http schemes are skipped — the bounds stay null and the
-        // client falls back to slot defaults until someone re-uploads or
-        // Recenter is invoked. Failures are logged and swallowed: a bbox
-        // miss should never block creating the row.
+        // Auto-compute bbox at register time; absolute http(s) only; failures swallowed.
         var bounds = await TryComputeBoundsAsync(dto.PreviewAssetUrl, ct);
         if (bounds != null)
         {
@@ -105,9 +97,7 @@ public sealed class RegisterAvatarItemByUrlHandler : IRequestHandler<RegisterAva
         return HandlerResult<AvatarItemDto>.Ok(_mapper.Map<AvatarItemDto>(created));
     }
 
-    // Fetch + scan-or-bail. Mirrors RecomputeAvatarItemBoundsHandler but
-    // never surfaces an error to the caller — we don't want the register
-    // call to fail because the asset's host is temporarily unreachable.
+    // Fetch + scan-or-bail; failures never surface to the caller.
     private async Task<ContentBounds?> TryComputeBoundsAsync(string url, CancellationToken ct)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)

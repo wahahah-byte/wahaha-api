@@ -6,18 +6,7 @@ using DomainUserInventory = wahaha.API.Models.Domain.UserInventory;
 
 namespace wahaha.API.Handlers.AvatarItems;
 
-// The shop's purchase flow. Composes the four steps that have to succeed
-// together for a clean buy: catalogue availability check, no-duplicate
-// gate (matches the client's "hide owned items" UX — server enforces it
-// too so a stale client can't double-buy), debit + transaction log, and
-// inventory row creation with an optional auto-equip.
-//
-// Operations are sequenced read → write — not wrapped in an explicit DB
-// transaction because the existing balance-mutation paths (SpendPoints /
-// AddPoints / RefundPoints) don't either, and adopting transactions for
-// this one handler would create an inconsistency with no upstream
-// concurrency token. If we ever add row-version locking on Users, this
-// handler should adopt it then.
+// Shop purchase flow: availability check, no-dup gate, debit + tx log, inventory create + auto-equip.
 public sealed record PurchaseAvatarItemRequest(Guid UserId, int ItemId, bool AutoEquip);
 
 public sealed class PurchaseAvatarItemHandler
@@ -69,11 +58,7 @@ public sealed class PurchaseAvatarItemHandler
             return HandlerResult<PurchaseAvatarItemResponseDto>.BadRequest(
                 $"Insufficient points: need {item.Cost}, have {user.CurrentBalance}.");
 
-        // Log the transaction first, then debit — matches the order used by
-        // CheckInTask.cs for the EARN side. If the debit fails after the tx
-        // row is written we'd have an orphan SPEND row; we keep the order
-        // because the inverse (debit-then-log) risks losing the audit trail
-        // if the tx write throws after balance has already moved.
+        // Log tx first, then debit — preserves audit trail if balance write throws.
         var transaction = new PointTransaction
         {
             UserId = request.UserId,
@@ -106,15 +91,12 @@ public sealed class PurchaseAvatarItemHandler
 
         if (request.AutoEquip)
         {
-            // EquipAsync unequips any currently-equipped item in the same
-            // slot first so the chibi composite stays consistent.
+            // EquipAsync unequips any other item in the same slot first.
             await _inventoryRepo.EquipAsync(inv.InventoryId);
             inv.IsEquipped = true;
         }
 
-        // Re-load with AvatarItem nav populated (CreateAsync's return value
-        // doesn't include it) so the client gets slot, asset URL, render
-        // hints, bounds — everything the inventory grid + chibi need.
+        // Re-load with AvatarItem nav populated for the inventory grid + chibi.
         var full = await _inventoryRepo.GetByIdAsync(inv.InventoryId) ?? inv;
 
         _logger.LogInformation(

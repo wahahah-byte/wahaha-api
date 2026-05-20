@@ -3,12 +3,7 @@ using wahaha.API.Services.Interfaces;
 
 namespace wahaha.API.BackgroundServices;
 
-/// <summary>
-/// Sweeps overdue non-recurring in_progress tasks and applies the auto-demotion penalty.
-/// Runs once at startup, then every 24 hours. Uses UTC date as the threshold (no client
-/// timezone available in a server-side job); the on-read path in TasksController.GetAll
-/// catches any timezone-edge cases the moment the user opens the app.
-/// </summary>
+// Sweeps overdue in_progress tasks and applies auto-demotion penalty; runs every 24h.
 public class PenaltyJob : BackgroundService
 {
     private readonly IServiceProvider _services;

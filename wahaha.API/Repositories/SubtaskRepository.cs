@@ -40,10 +40,7 @@ public class SubtaskRepository : Repository<Subtask, int>, ISubtaskRepository
 
     public async Task<int> ResetCompletionByTaskIdAsync(Guid taskId)
     {
-        // Atomic SQL UPDATE — was previously SELECT + per-row modify +
-        // SaveChanges, which cost two round trips per check-in. Filtering on
-        // (Completed || SetsCompleted != null) in the WHERE clause means we
-        // only touch rows that actually need resetting.
+        // Atomic SQL UPDATE; WHERE filter scopes to rows that actually need resetting.
         var changed = await _dbSet
             .Where(s => s.TaskId == taskId && (s.Completed || s.SetsCompleted != null))
             .ExecuteUpdateAsync(setters => setters
@@ -53,10 +50,7 @@ public class SubtaskRepository : Repository<Subtask, int>, ISubtaskRepository
         {
             _logger.LogInformation("Reset completion on {Count} subtask(s) for task {TaskId}", changed, taskId);
         }
-        // Detach any tracked Subtask rows belonging to this task so any
-        // follow-up read in the same DbContext sees the post-reset DB state
-        // rather than the cached pre-reset entities (mirrors what
-        // StreakRepository.IncrementAsync does for the same reason).
+        // Detach tracked subtasks so follow-up reads see post-reset values.
         foreach (var entry in _context.ChangeTracker.Entries<Subtask>().ToList())
         {
             if (entry.Entity.TaskId == taskId) entry.State = EntityState.Detached;

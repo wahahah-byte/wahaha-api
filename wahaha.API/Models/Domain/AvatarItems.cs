@@ -40,10 +40,7 @@ public class AvatarItem
     [Column("preview_asset_url")]
     public string? PreviewAssetUrl { get; set; }
 
-    // Optional second PNG used for two-layer items where one row drives two
-    // render layers — currently only HAIR_FRONT items that also draw a back
-    // layer (the strands behind the head). Rendered by ChibiAvatar at
-    // HAIR_BACK z-order; the inventory card still shows only PreviewAssetUrl.
+    // Optional second PNG for two-layer items (HAIR_FRONT today); drawn at HAIR_BACK z-order.
     [MaxLength(255)]
     [Column("secondary_asset_url")]
     public string? SecondaryAssetUrl { get; set; }
@@ -52,66 +49,42 @@ public class AvatarItem
     [Column("is_available")]
     public bool IsAvailable { get; set; } = true;
 
-    // RE-style inventory footprint. Nullable so old rows can fall back to the
-    // client-side default of 1x1. The avatar page uses these to render each
-    // item across (GridCols × GridRows) cells of the user's inventory grid.
+    // RE-style inventory footprint; null falls back to 1x1 client-side.
     [Column("grid_cols")]
     public int? GridCols { get; set; }
 
     [Column("grid_rows")]
     public int? GridRows { get; set; }
 
-    // ---- Render hints (chibi composite tuning) -------------------------------
-    // Optional per-item knobs the chibi rendering layer uses to position the
-    // PNG correctly over base.png. All nullable — when unset, the frontend
-    // falls back to per-slot defaults (SLOT_TRANSFORM / SLOT_Z). Surfaced
-    // through the admin "Advanced" panel in AvatarItemFormModal so artists
-    // can dial them in per asset without code edits. These used to live in a
-    // frontend RENDER_HINTS dictionary keyed by filename.
+    // Render hints (chibi composite tuning); null = use per-slot defaults client-side.
 
-    // Hides HAIR_FRONT (bangs) when this item is equipped — e.g. a helmet
-    // that fully covers the front of the head.
+    // Hides HAIR_FRONT (bangs) when equipped.
     [Column("covers_hair_front")]
     public bool? CoversHairFront { get; set; }
 
-    // Hides HAIR_BACK when this item is equipped — uncommon, used for full
-    // headpieces that wrap the back of the skull.
+    // Hides HAIR_BACK when equipped.
     [Column("covers_hair_back")]
     public bool? CoversHairBack { get; set; }
 
-    // Pixel nudges in source-canvas coordinates (relative to a 256-wide /
-    // 384-tall canvas; rescaled to the rendered chibi size client-side).
-    // Positive = right / down. Use for sprites whose visual anchor sits a
-    // few pixels off the canvas centreline.
+    // Pixel nudges in source-canvas coords (positive = right/down).
     [Column("offset_x")]
     public int? OffsetX { get; set; }
 
     [Column("offset_y")]
     public int? OffsetY { get; set; }
 
-    // Uniform scale applied around the item's centre. 1.0 = no scaling.
-    // Typical range 0.5–2.5. Use to enlarge a small sprite or shrink one
-    // drawn at a larger size than the canvas region it occupies.
+    // Uniform scale around item centre (1.0 = none).
     [Column("render_scale")]
     public double? RenderScale { get; set; }
 
-    // Native canvas dimensions of the asset. Default to 256×384 (matching
-    // base.png) when null. Set when a sprite extends past the character
-    // bounds — e.g. an oversized weapon drawn on a 384×384 canvas.
+    // Native canvas dimensions of the asset; default 256×384 when null.
     [Column("source_width")]
     public int? SourceWidth { get; set; }
 
     [Column("source_height")]
     public int? SourceHeight { get; set; }
 
-    // ---- Content bounding box (auto-centering for inventory cards) -----------
-    // Tight bbox of non-transparent pixels in the uploaded PNG, computed at
-    // upload time via ImageSharp. The frontend uses these to translate/scale
-    // the source so its visible content centres inside the inventory card,
-    // instead of relying on hand-tuned per-slot defaults in SLOT_TRANSFORM.
-    // All nullable: existing rows (and items registered by external URL,
-    // where the asset isn't in our blob storage) fall back to slot defaults.
-
+    // Tight bbox of non-transparent pixels, computed via ImageSharp at upload time.
     [Column("content_min_x")]
     public int? ContentMinX { get; set; }
 
@@ -124,18 +97,14 @@ public class AvatarItem
     [Column("content_max_y")]
     public int? ContentMaxY { get; set; }
 
-    // Navigation property
+    // Navigation property.
     public ICollection<UserInventory> UserInventories { get; set; } = new List<UserInventory>();
 }
 
-// EF stores enum values as their underlying int by default. The legacy 7
-// slots are kept at positions 0-6 so existing rows (seeded HEAD/HAIR/BODY/
-// HAND/FACE/BACK/FEET items) keep validating without a data migration.
-// New uploads should use the granular MapleStory-style slots below — the
-// admin UI offers those exclusively in the slot dropdown going forward.
+// Legacy slots 0-6 kept for compat; new uploads use the granular MapleStory-style slots below.
 public enum ItemSlot
 {
-    // ---- Legacy aliases (deprecated for new uploads, kept for compat) ----
+    // Legacy aliases (deprecated for new uploads).
     HEAD = 0,
     HAIR = 1,
     BODY = 2,
@@ -144,18 +113,13 @@ public enum ItemSlot
     BACK = 5,
     FEET = 6,
 
-    // ---- Granular slots, MapleStory-style -------------------------------
-    // Ordered roughly back-to-front so the int value implies render z-order
-    // (the frontend overrides z-order explicitly anyway, this is just for
-    // human readability of stored values).
+    // Granular slots, ordered roughly back-to-front for readability.
     WEAPON_BACK  = 7,
     CAPE         = 8,
     HAIR_BACK    = 9,
     BOTTOM       = 10,
     TOP          = 11,
-    // OVERALL is a one-piece — when equipped, the chibi composite suppresses
-    // any equipped TOP and BOTTOM behind it. The user can still own + equip
-    // a TOP/BOTTOM underneath; they're just visually hidden.
+    // OVERALL is a one-piece; suppresses equipped TOP/BOTTOM visually but keeps them owned.
     OVERALL      = 12,
     GLOVES       = 13,
     SHOES        = 14,

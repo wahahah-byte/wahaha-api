@@ -11,7 +11,6 @@ public interface IUserInventoryRepository : IRepository<UserInventory, int>
     Task<PagedResult<UserInventory>> GetFilteredAsync(UserInventoryFilterParams filters);
     Task<bool> EquipAsync(int id);
     Task<bool> UnequipAsync(int id);
-    // Used by the shop's no-duplicates gate — returns true if the user
-    // already holds at least one inventory row for the given catalogue item.
+    // Shop no-duplicates gate: true if user already owns the catalogue item.
     Task<bool> UserOwnsItemAsync(Guid userId, int itemId);
 }

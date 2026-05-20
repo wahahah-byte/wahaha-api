@@ -113,32 +113,20 @@ public class AvatarItemsController : ControllerBase
     public async Task<IActionResult> ToggleAvailability(int id)
         => (await _toggle.HandleAsync(new ToggleAvatarItemAvailabilityRequest(id))).ToActionResult();
 
-    // Re-scans the item's PreviewAssetUrl and stores fresh content bounds.
-    // Returns the updated DTO so the admin UI can splice it in without a
-    // full re-fetch. See RecomputeAvatarItemBoundsHandler for the supported
-    // URL shapes — only absolute http(s) URLs work; relative seed paths
-    // need to be edited and re-uploaded through the form instead.
+    // Re-scan PreviewAssetUrl and store fresh content bounds; absolute http(s) URLs only.
     [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
     [HttpPost("{id}/recompute-bounds")]
     public async Task<ActionResult<AvatarItemDto>> RecomputeBounds(int id)
         => (await _recomputeBounds.HandleAsync(new RecomputeAvatarItemBoundsRequest(id))).ToActionResult();
 
-    // Admin convenience for handing an item to a user without going
-    // through the regular acquire flow (which charges points). Body's
-    // TargetEmail is optional — empty / missing grants to the calling
-    // admin themselves. AutoEquip flips the new inventory row to
-    // equipped (unequipping any other item in the same slot).
+    // Admin grant: hand item to target email (defaults to caller); AutoEquip slot-swaps.
     [Authorize(Roles = $"{WahahaUserRoles.Admin},{WahahaUserRoles.Moderator}")]
     [HttpPost("{id}/grant")]
     public async Task<ActionResult<UserInventoryDto>> Grant(int id, [FromBody] GrantAvatarItemDto dto)
         => (await _grant.HandleAsync(new GrantAvatarItemRequest(
             GetCurrentUserId(), id, dto?.TargetEmail, dto?.AutoEquip ?? false))).ToActionResult();
 
-    // Shop purchase — any authenticated user. UserId comes from the JWT
-    // (no target field on PurchaseAvatarItemDto), so a user can only buy
-    // for themselves. Body is optional; missing body defaults to no
-    // auto-equip. Returns the new inventory row plus the updated balance
-    // so the client can refresh both without a follow-up /me call.
+    // Shop purchase by JWT user; returns new inventory row plus updated balance.
     [Authorize]
     [HttpPost("{id}/purchase")]
     public async Task<ActionResult<PurchaseAvatarItemResponseDto>> Purchase(int id, [FromBody] PurchaseAvatarItemDto? dto)

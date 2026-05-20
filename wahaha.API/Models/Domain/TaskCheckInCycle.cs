@@ -25,15 +25,13 @@ public class TaskCheckInCycle
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // "checkin" = full check-in (advances cycle, awards points, increments streak).
-    // "log"     = counter-only entry (no side effects).
+    // "checkin" = full check-in (cycle/points/streak); "log" = counter-only entry.
     [Required]
     [MaxLength(16)]
     [Column("cycle_type")]
     public string CycleType { get; set; } = "checkin";
 
-    // Rollback snapshot — populated only when CycleType == "checkin" so undo can
-    // restore the task/streak/balance to their pre-check-in state.
+    // Rollback snapshot populated only for checkin cycles.
     [Column("points_awarded")]
     public int? PointsAwarded { get; set; }
 

@@ -6,11 +6,7 @@ namespace wahaha.API.Scripts;
 
 public static class UserMigrationScript
 {
-    /// <summary>
-    /// Call this once from Program.cs after var app = builder.Build()
-    /// to migrate existing Users table entries into ASP.NET Core Identity.
-    /// Remove the call from Program.cs after running successfully.
-    /// </summary>
+    // One-shot migration of existing Users rows into ASP.NET Core Identity.
     public static async Task MigrateExistingUsers(IServiceProvider serviceProvider)
     {
         using var scope = serviceProvider.CreateScope();
@@ -22,13 +18,11 @@ public static class UserMigrationScript
 
         foreach (var appUser in existingUsers)
         {
-            // Generate email from username: e.g. DailyDragon -> dailydragon+test@wahaha.com
+            // Generate email from username (e.g. DailyDragon -> dailydragon+test@wahaha.com).
             var formattedEmail = $"{appUser.Username.ToLower()}+test@wahaha.com";
 
-            // Update the email in the Users table to match
             appUser.Email = formattedEmail;
 
-            // Skip if identity user already exists for this email
             var existing = await userManager.FindByEmailAsync(formattedEmail);
             if (existing != null)
             {
@@ -38,7 +32,7 @@ public static class UserMigrationScript
 
             var identityUser = new ApplicationUser
             {
-                UserName = appUser.Username,   // preserve original username
+                UserName = appUser.Username,
                 Email = formattedEmail,
                 EmailConfirmed = true,
                 AppUserId = appUser.UserId
@@ -53,7 +47,6 @@ public static class UserMigrationScript
                 Console.WriteLine($"Failed: {appUser.Username} — {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
 
-        // Save the updated emails back to the Users table
         await wahahaContext.SaveChangesAsync();
 
         Console.WriteLine("Migration complete.");
