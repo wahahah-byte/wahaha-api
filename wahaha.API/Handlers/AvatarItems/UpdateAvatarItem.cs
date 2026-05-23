@@ -1,4 +1,5 @@
 using AutoMapper;
+using wahaha.API.Models.Domain;
 using wahaha.API.Models.DTO;
 using wahaha.API.Repositories.Interfaces;
 using wahaha.API.Services.Interfaces;
@@ -42,6 +43,11 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             _logger.LogWarning("Avatar item {ItemId} not found for update", request.ItemId);
             return HandlerResult<Unit>.NotFound($"Avatar item with ID {request.ItemId} was not found.");
         }
+        if (!Enum.TryParse<ItemSlot>(request.Dto.Slot, true, out var slotEnum))
+            return HandlerResult<Unit>.BadRequest($"Invalid slot '{request.Dto.Slot}'.");
+        if (!AvatarCategoryWhitelist.IsValid(slotEnum, request.Dto.Category))
+            return HandlerResult<Unit>.BadRequest(
+                $"Invalid category '{request.Dto.Category}' for slot {slotEnum}. Allowed: {AvatarCategoryWhitelist.AllowedFor(slotEnum)}.");
 
         if (request.Dto.Image != null)
         {
@@ -94,6 +100,23 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
             _logger.LogInformation("Secondary image updated for avatar item {ItemId}: {Url}", request.ItemId, item.SecondaryAssetUrl);
         }
 
+        // Equipped image: drop-old + upload-new; no bbox scan; missing image leaves URL untouched.
+        if (request.Dto.EquippedImage != null)
+        {
+            if (!IsValidImage(request.Dto.EquippedImage))
+            {
+                _logger.LogWarning("Invalid equipped image upload for avatar item {ItemId}", request.ItemId);
+                return HandlerResult<Unit>.BadRequest("Invalid equipped image. Only JPG, PNG and WebP files under 5MB are allowed.");
+            }
+            if (!string.IsNullOrEmpty(item.EquippedAssetUrl))
+                await _blobService.DeleteAsync(item.EquippedAssetUrl, ContainerName);
+            item.EquippedAssetUrl = await _blobService.UploadAsync(
+                request.Dto.EquippedImage,
+                ContainerName,
+                BuildBlobName(request.Dto.Slot, request.Dto.Name) + "_equipped");
+            _logger.LogInformation("Equipped image updated for avatar item {ItemId}: {Url}", request.ItemId, item.EquippedAssetUrl);
+        }
+
         _mapper.Map(request.Dto, item);
         await _repo.UpdateAsync(item);
         _logger.LogInformation("Avatar item {ItemId} updated successfully", request.ItemId);
@@ -111,7 +134,10 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
 
-    // CAPE secondary = front drape; HAIR_FRONT and WEAPON_FRONT secondaries = back.
+    // CAPE / OFFHAND secondary = FRONT overlay (drape / strap wrap);
+    // HAIR_FRONT and WEAPON_FRONT secondaries = back layer.
     private static string SecondarySuffix(string slot)
-        => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase) ? "_front" : "_back";
+        => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase)
+           || slot.Equals("OFFHAND", StringComparison.OrdinalIgnoreCase)
+            ? "_front" : "_back";
 }

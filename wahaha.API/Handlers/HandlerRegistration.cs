@@ -107,6 +107,7 @@ public static class HandlerRegistration
         services.AddScoped<IRequestHandler<UserInventory.UnequipInventoryRequest, Unit>, UserInventory.UnequipInventoryHandler>();
         services.AddScoped<IRequestHandler<UserInventory.SetInventoryPositionRequest, Unit>, UserInventory.SetInventoryPositionHandler>();
         services.AddScoped<IRequestHandler<UserInventory.DeleteInventoryEntryRequest, Unit>, UserInventory.DeleteInventoryEntryHandler>();
+        services.AddScoped<IRequestHandler<UserInventory.SellInventoryRequest, SellInventoryResponseDto>, UserInventory.SellInventoryHandler>();
 
         // Users
         services.AddScoped<IRequestHandler<Users.GetCurrentUserRequest, UserDto>, Users.GetCurrentUserHandler>();

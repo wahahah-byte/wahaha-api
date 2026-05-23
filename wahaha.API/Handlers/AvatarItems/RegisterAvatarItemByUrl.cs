@@ -41,6 +41,9 @@ public sealed class RegisterAvatarItemByUrlHandler : IRequestHandler<RegisterAva
             return HandlerResult<AvatarItemDto>.BadRequest($"Invalid slot. Valid: {string.Join(", ", Enum.GetNames<ItemSlot>())}");
         if (!Enum.TryParse<Rarity>(dto.Rarity, true, out var rarity))
             return HandlerResult<AvatarItemDto>.BadRequest($"Invalid rarity. Valid: {string.Join(", ", Enum.GetNames<Rarity>())}");
+        if (!AvatarCategoryWhitelist.IsValid(slot, dto.Category))
+            return HandlerResult<AvatarItemDto>.BadRequest(
+                $"Invalid category '{dto.Category}' for slot {slot}. Allowed: {AvatarCategoryWhitelist.AllowedFor(slot)}.");
 
         _logger.LogInformation("Registering avatar item {Name} from URL {Url}", dto.Name, dto.PreviewAssetUrl);
 
@@ -54,6 +57,7 @@ public sealed class RegisterAvatarItemByUrlHandler : IRequestHandler<RegisterAva
             Description = dto.Description,
             PreviewAssetUrl = dto.PreviewAssetUrl,
             SecondaryAssetUrl = string.IsNullOrWhiteSpace(dto.SecondaryAssetUrl) ? null : dto.SecondaryAssetUrl,
+            EquippedAssetUrl = string.IsNullOrWhiteSpace(dto.EquippedAssetUrl) ? null : dto.EquippedAssetUrl,
             IsAvailable = dto.IsAvailable,
             // Optional render hints; null = use slot defaults client-side.
             CoversHairFront = dto.CoversHairFront,

@@ -21,6 +21,7 @@ public class UserInventoryController : ControllerBase
     private readonly IRequestHandler<UnequipInventoryRequest, Unit> _unequip;
     private readonly IRequestHandler<SetInventoryPositionRequest, Unit> _setPosition;
     private readonly IRequestHandler<DeleteInventoryEntryRequest, Unit> _delete;
+    private readonly IRequestHandler<SellInventoryRequest, SellInventoryResponseDto> _sell;
 
     public UserInventoryController(
         IRequestHandler<GetInventoryListRequest, PagedResult<UserInventoryDto>> list,
@@ -30,7 +31,8 @@ public class UserInventoryController : ControllerBase
         IRequestHandler<EquipInventoryRequest, Unit> equip,
         IRequestHandler<UnequipInventoryRequest, Unit> unequip,
         IRequestHandler<SetInventoryPositionRequest, Unit> setPosition,
-        IRequestHandler<DeleteInventoryEntryRequest, Unit> delete)
+        IRequestHandler<DeleteInventoryEntryRequest, Unit> delete,
+        IRequestHandler<SellInventoryRequest, SellInventoryResponseDto> sell)
     {
         _list = list;
         _byId = byId;
@@ -40,6 +42,7 @@ public class UserInventoryController : ControllerBase
         _unequip = unequip;
         _setPosition = setPosition;
         _delete = delete;
+        _sell = sell;
     }
 
     private Guid GetCurrentUserId()
@@ -101,4 +104,14 @@ public class UserInventoryController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
         => (await _delete.HandleAsync(new DeleteInventoryEntryRequest(id, GetCurrentUserId()))).ToActionResult();
+
+    // Sell an inventory item back for a partial refund. Returns the refund amount + new balance.
+    [HttpPatch("{id}/sell")]
+    public async Task<ActionResult<SellInventoryResponseDto>> Sell(int id)
+    {
+        var result = await _sell.HandleAsync(new SellInventoryRequest(id, GetCurrentUserId()));
+        return result.Status == HandlerStatus.Ok
+            ? Ok(result.Value)
+            : result.ToActionResult();
+    }
 }

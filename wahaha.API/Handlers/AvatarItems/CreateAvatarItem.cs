@@ -35,6 +35,11 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
     {
         var dto = request.Dto;
         _logger.LogInformation("Creating avatar item {Name}", dto.Name);
+        if (!Enum.TryParse<ItemSlot>(dto.Slot, true, out var slotEnum))
+            return HandlerResult<AvatarItemDto>.BadRequest($"Invalid slot '{dto.Slot}'.");
+        if (!AvatarCategoryWhitelist.IsValid(slotEnum, dto.Category))
+            return HandlerResult<AvatarItemDto>.BadRequest(
+                $"Invalid category '{dto.Category}' for slot {slotEnum}. Allowed: {AvatarCategoryWhitelist.AllowedFor(slotEnum)}.");
         var item = _mapper.Map<AvatarItem>(dto);
 
         if (dto.Image != null)
@@ -76,6 +81,21 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
             _logger.LogInformation("Secondary image uploaded for avatar item {Name}: {Url}", dto.Name, item.SecondaryAssetUrl);
         }
 
+        // Equipped/worn image: separate blob; no bbox scan (only catalog preview is bbox-scanned).
+        if (dto.EquippedImage != null)
+        {
+            if (!IsValidImage(dto.EquippedImage))
+            {
+                _logger.LogWarning("Invalid equipped image upload for avatar item {Name}", dto.Name);
+                return HandlerResult<AvatarItemDto>.BadRequest("Invalid equipped image. Only JPG, PNG and WebP files under 5MB are allowed.");
+            }
+            item.EquippedAssetUrl = await _blobService.UploadAsync(
+                dto.EquippedImage,
+                ContainerName,
+                BuildBlobName(dto.Slot, dto.Name) + "_equipped");
+            _logger.LogInformation("Equipped image uploaded for avatar item {Name}: {Url}", dto.Name, item.EquippedAssetUrl);
+        }
+
         var created = await _repo.CreateAsync(item);
         _logger.LogInformation("Avatar item {ItemId} ({Name}) created successfully", created.ItemId, created.Name);
         return HandlerResult<AvatarItemDto>.Ok(_mapper.Map<AvatarItemDto>(created));
@@ -92,7 +112,10 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
 
-    // Slot-dependent secondary suffix: CAPE = "_front" (front drape), else "_back".
+    // Slot-dependent secondary suffix: CAPE / OFFHAND secondaries are the FRONT overlay
+    // (front drape / strap wrap over the arm); other slots use the secondary as a BACK layer.
     private static string SecondarySuffix(string slot)
-        => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase) ? "_front" : "_back";
+        => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase)
+           || slot.Equals("OFFHAND", StringComparison.OrdinalIgnoreCase)
+            ? "_front" : "_back";
 }

@@ -45,6 +45,13 @@ public class AvatarItem
     [Column("secondary_asset_url")]
     public string? SecondaryAssetUrl { get; set; }
 
+    // Optional "worn" view, used by the chibi composite when the catalog preview is
+    // a different angle (e.g. shields: shop shows front face, chibi shows back/strap).
+    // When null, ChibiAvatar falls back to PreviewAssetUrl.
+    [MaxLength(255)]
+    [Column("equipped_asset_url")]
+    public string? EquippedAssetUrl { get; set; }
+
     [Required]
     [Column("is_available")]
     public bool IsAvailable { get; set; } = true;
@@ -129,6 +136,8 @@ public enum ItemSlot
     HAT          = 18,
     WEAPON_FRONT = 19,
     WRIST        = 20,
+    // Off-hand: shield, dagger, orb, tome, etc. — secondary item held in the off-hand.
+    OFFHAND      = 21,
 }
 public enum Rarity
 {

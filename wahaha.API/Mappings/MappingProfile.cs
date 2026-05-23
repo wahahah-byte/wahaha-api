@@ -18,6 +18,7 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)))
             .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())   // handled by BlobService
             .ForMember(dest => dest.SecondaryAssetUrl, opt => opt.Ignore()) // handled by BlobService
+            .ForMember(dest => dest.EquippedAssetUrl, opt => opt.Ignore())  // handled by BlobService
             .ForMember(dest => dest.UserInventories, opt => opt.Ignore());
 
         CreateMap<UpdateAvatarItemDto, AvatarItem>()
@@ -25,6 +26,7 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Rarity, opt => opt.MapFrom(src => Enum.Parse<Rarity>(src.Rarity, true)))
             .ForMember(dest => dest.PreviewAssetUrl, opt => opt.Ignore())   // handled by BlobService
             .ForMember(dest => dest.SecondaryAssetUrl, opt => opt.Ignore()) // handled by BlobService
+            .ForMember(dest => dest.EquippedAssetUrl, opt => opt.Ignore())  // handled by BlobService
             .ForMember(dest => dest.UserInventories, opt => opt.Ignore());
 
         // Minigame
@@ -110,9 +112,16 @@ public class MappingProfile : Profile
 
         // Users
         CreateMap<Users, UserDto>()
+            // PointsSubmittedToday is the daily-cap counter — only task-source EARNs count
+            // toward it. Other EARN sources (shop_item refunds, streak/achievement bonuses,
+            // minigame wins) are NOT subject to the cap and would otherwise inflate the
+            // nav-drawer progress bars. Matches SubmitPoints' alreadyEarnedRegular/Recurring
+            // queries which also filter by SourceType.task / SourceType.recurring_task.
             .ForMember(dest => dest.PointsSubmittedToday, opt => opt.MapFrom(src =>
                 src.PointTransactions
-                    .Where(pt => pt.Type == TransactionType.EARN && pt.CreatedAt.Date == DateTime.UtcNow.Date)
+                    .Where(pt => pt.Type == TransactionType.EARN
+                              && (pt.SourceType == SourceType.task || pt.SourceType == SourceType.recurring_task)
+                              && pt.CreatedAt.Date == DateTime.UtcNow.Date)
                     .Sum(pt => pt.Amount)))
             .ForMember(dest => dest.RecurringPointsSubmittedToday, opt => opt.MapFrom(src =>
                 src.PointTransactions

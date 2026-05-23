@@ -94,6 +94,7 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
             return false;
         }
 
+        // Same-slot mutex: drop any other equipped item in the same slot for this user.
         var sameSlotItems = await _dbSet
             .Where(i => i.UserId == entry.UserId
                      && i.IsEquipped
@@ -104,11 +105,90 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
         foreach (var other in sameSlotItems)
             other.IsEquipped = false;
 
+        // 2H WEAPON_FRONT and OFFHAND are mutually exclusive (MapleStory rule).
+        // Category-based 2H detection — staff/polearm/bow/greatsword/two-hand.
+        if (IsTwoHanded(entry.AvatarItem))
+        {
+            // Equipping a 2H primary: drop any equipped off-hand item.
+            var offhandItems = await _dbSet
+                .Include(i => i.AvatarItem)
+                .Where(i => i.UserId == entry.UserId
+                         && i.IsEquipped
+                         && i.AvatarItem!.Slot == ItemSlot.OFFHAND
+                         && i.InventoryId != id)
+                .ToListAsync();
+            foreach (var off in offhandItems)
+                off.IsEquipped = false;
+        }
+        else if (entry.AvatarItem!.Slot == ItemSlot.OFFHAND)
+        {
+            // Equipping an off-hand: drop any equipped 2H primary weapon.
+            var frontWeapons = await _dbSet
+                .Include(i => i.AvatarItem)
+                .Where(i => i.UserId == entry.UserId
+                         && i.IsEquipped
+                         && i.AvatarItem!.Slot == ItemSlot.WEAPON_FRONT
+                         && i.InventoryId != id)
+                .ToListAsync();
+            foreach (var fw in frontWeapons)
+            {
+                if (IsTwoHanded(fw.AvatarItem)) fw.IsEquipped = false;
+            }
+        }
+
+        // Cross-slot mutex groups (outfit / hair / hat). Filter the user's equipped rows
+        // to the ones whose slot conflicts with the new item's slot, drop them.
+        var crossSlotConflicts = await _dbSet
+            .Include(i => i.AvatarItem)
+            .Where(i => i.UserId == entry.UserId
+                     && i.IsEquipped
+                     && i.InventoryId != id
+                     && i.AvatarItem!.Slot != entry.AvatarItem!.Slot)
+            .ToListAsync();
+        foreach (var row in crossSlotConflicts)
+        {
+            if (ShouldDropOnEquip(entry.AvatarItem!.Slot, row.AvatarItem!.Slot))
+                row.IsEquipped = false;
+        }
+
         entry.IsEquipped = true;
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Inventory item {InventoryId} equipped successfully", id);
         return true;
+    }
+
+    // Two-handed primary weapons block the off-hand slot. Mirrors apps/web/src/app/avatar/page.tsx
+    // isTwoHanded — keep the token list in sync across client + server.
+    private static bool IsTwoHanded(AvatarItem? item)
+    {
+        if (item == null || item.Slot != ItemSlot.WEAPON_FRONT) return false;
+        var cat = (item.Category ?? string.Empty).ToLowerInvariant();
+        return cat.Contains("staff")
+            || cat.Contains("polearm")
+            || cat.Contains("bow")
+            || cat.Contains("greatsword")
+            || cat.Contains("two-hand")
+            || cat.Contains("twohand");
+    }
+
+    // Cross-slot equip mutex groups. Mirrors apps/web/src/app/avatar/page.tsx shouldDropOnEquip
+    // — keep the groups in sync across client + server.
+    //   Outfit: OVERALL/BODY (full-body) ↔ TOP/BOTTOM (partial). Partials coexist with each other.
+    //   Hair:   HAIR / HAIR_FRONT / HAIR_BACK.
+    //   Hat:    HAT / HEAD.
+    private static bool ShouldDropOnEquip(ItemSlot newSlot, ItemSlot existingSlot)
+    {
+        if (newSlot == existingSlot) return false;
+        bool IsFull(ItemSlot s) => s == ItemSlot.OVERALL || s == ItemSlot.BODY;
+        bool IsPartial(ItemSlot s) => s == ItemSlot.TOP || s == ItemSlot.BOTTOM;
+        if (IsFull(newSlot) && (IsFull(existingSlot) || IsPartial(existingSlot))) return true;
+        if (IsPartial(newSlot) && IsFull(existingSlot)) return true;
+        bool IsHair(ItemSlot s) => s == ItemSlot.HAIR || s == ItemSlot.HAIR_FRONT || s == ItemSlot.HAIR_BACK;
+        if (IsHair(newSlot) && IsHair(existingSlot)) return true;
+        bool IsHat(ItemSlot s) => s == ItemSlot.HAT || s == ItemSlot.HEAD;
+        if (IsHat(newSlot) && IsHat(existingSlot)) return true;
+        return false;
     }
 
     public async Task<bool> UnequipAsync(int id)

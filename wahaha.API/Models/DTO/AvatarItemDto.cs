@@ -17,6 +17,10 @@ public class AvatarItemDto
     // Optional secondary blob URL for two-layer items (HAIR_FRONT today); null = single-layer.
     public string? SecondaryAssetUrl { get; set; }
 
+    // Optional "worn" view used by the chibi composite when the catalog preview is a
+    // different angle (e.g. shields: shop = front face, chibi = back/strap). Null = fall back to PreviewAssetUrl.
+    public string? EquippedAssetUrl { get; set; }
+
     // Inventory footprint in grid cells; null = 1x1 client-side.
     public int? GridCols { get; set; }
     public int? GridRows { get; set; }
@@ -68,6 +72,9 @@ public class CreateAvatarItemDto
     // Optional second image for two-layer items (HAIR_FRONT today); null = single-layer.
     public IFormFile? SecondaryImage { get; set; }
 
+    // Optional "worn" image — used by the chibi composite when distinct from the catalog view.
+    public IFormFile? EquippedImage { get; set; }
+
     // Optional render hints; null = use per-slot defaults client-side.
     public bool? CoversHairFront { get; set; }
     public bool? CoversHairBack { get; set; }
@@ -111,6 +118,11 @@ public class RegisterAvatarItemByUrlDto
     [MaxLength(255)]
     public string? SecondaryAssetUrl { get; set; }
 
+    // Optional already-uploaded "worn" view URL; null = chibi falls back to PreviewAssetUrl.
+    [Url]
+    [MaxLength(255)]
+    public string? EquippedAssetUrl { get; set; }
+
     public bool IsAvailable { get; set; } = true;
 
     // When true, also grants + equips on the current user (auto-unequip slot rivals).
@@ -149,6 +161,15 @@ public class PurchaseAvatarItemResponseDto
     public int NewBalance { get; set; }
 }
 
+// Sell response: refund credited + post-sale balance + the inventoryId that was removed
+// (so the client can splice it out of its local inventory list).
+public class SellInventoryResponseDto
+{
+    public int InventoryId { get; set; }
+    public int RefundedPoints { get; set; }
+    public int NewBalance { get; set; }
+}
+
 public class UpdateAvatarItemDto
 {
     public int ItemId { get; set; }
@@ -175,6 +196,9 @@ public class UpdateAvatarItemDto
 
     // Optional new secondary image; absent leaves existing SecondaryAssetUrl untouched.
     public IFormFile? SecondaryImage { get; set; }
+
+    // Optional new "worn" image; absent leaves existing EquippedAssetUrl untouched.
+    public IFormFile? EquippedImage { get; set; }
 
     // Optional render hints; null clears the field server-side.
     public bool? CoversHairFront { get; set; }
