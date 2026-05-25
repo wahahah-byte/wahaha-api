@@ -16,6 +16,10 @@ public class RegisterDto
     [Required]
     [MinLength(8)]
     public string Password { get; set; } = string.Empty;
+
+    // 13+ age gate enforced in RegisterUserHandler against this value.
+    [Required]
+    public DateOnly DateOfBirth { get; set; }
 }
 
 public class LoginDto

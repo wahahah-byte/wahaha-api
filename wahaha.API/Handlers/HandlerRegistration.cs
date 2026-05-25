@@ -116,6 +116,7 @@ public static class HandlerRegistration
         services.AddScoped<IRequestHandler<Users.DeleteProfilePictureRequest, Unit>, Users.DeleteProfilePictureHandler>();
         services.AddScoped<IRequestHandler<Users.AddPointsRequest, Unit>, Users.AddPointsHandler>();
         services.AddScoped<IRequestHandler<Users.SpendPointsRequest, Unit>, Users.SpendPointsHandler>();
+        services.AddScoped<IRequestHandler<Users.DeleteAccountRequest, Unit>, Users.DeleteAccountHandler>();
 
         return services;
     }

@@ -17,6 +17,7 @@ public class UsersController : ControllerBase
     private readonly IRequestHandler<DeleteProfilePictureRequest, Unit> _deletePicture;
     private readonly IRequestHandler<AddPointsRequest, Unit> _addPoints;
     private readonly IRequestHandler<SpendPointsRequest, Unit> _spendPoints;
+    private readonly IRequestHandler<DeleteAccountRequest, Unit> _deleteAccount;
 
     public UsersController(
         IRequestHandler<GetCurrentUserRequest, UserDto> me,
@@ -24,7 +25,8 @@ public class UsersController : ControllerBase
         IRequestHandler<UploadProfilePictureRequest, UserDto> uploadPicture,
         IRequestHandler<DeleteProfilePictureRequest, Unit> deletePicture,
         IRequestHandler<AddPointsRequest, Unit> addPoints,
-        IRequestHandler<SpendPointsRequest, Unit> spendPoints)
+        IRequestHandler<SpendPointsRequest, Unit> spendPoints,
+        IRequestHandler<DeleteAccountRequest, Unit> deleteAccount)
     {
         _me = me;
         _update = update;
@@ -32,6 +34,7 @@ public class UsersController : ControllerBase
         _deletePicture = deletePicture;
         _addPoints = addPoints;
         _spendPoints = spendPoints;
+        _deleteAccount = deleteAccount;
     }
 
     private Guid GetCurrentUserId()
@@ -63,4 +66,11 @@ public class UsersController : ControllerBase
     [HttpPatch("spendpoints/{points}")]
     public async Task<IActionResult> SpendPoints(int points)
         => (await _spendPoints.HandleAsync(new SpendPointsRequest(GetCurrentUserId(), points))).ToActionResult();
+
+    // Permanently deletes the caller's account and all owned data. Client must clear its token
+    // after a 204 — the JWT remains technically valid until expiry but every authed request will
+    // now fail because the user row is gone.
+    [HttpDelete("me")]
+    public async Task<IActionResult> DeleteAccount()
+        => (await _deleteAccount.HandleAsync(new DeleteAccountRequest(GetCurrentUserId()))).ToActionResult();
 }

@@ -28,10 +28,27 @@ public sealed class RegisterUserHandler : IRequestHandler<RegisterUserRequest, A
         _logger = logger;
     }
 
+    // Minimum signup age (Children's Online Privacy Protection Act / Google Play general-audience policy).
+    private const int MinimumAgeYears = 13;
+
     public async Task<HandlerResult<AuthResponseDto>> HandleAsync(RegisterUserRequest request, CancellationToken ct = default)
     {
         var dto = request.Dto;
         _logger.LogInformation("Registration attempt for email {Email}", dto.Email);
+
+        // Age gate — reject implausible/future DOB AND under-13s. Computed against UTC today.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (dto.DateOfBirth > today)
+        {
+            return HandlerResult<AuthResponseDto>.BadRequest("Date of birth cannot be in the future.");
+        }
+        var age = today.Year - dto.DateOfBirth.Year;
+        if (dto.DateOfBirth > today.AddYears(-age)) age--;
+        if (age < MinimumAgeYears)
+        {
+            _logger.LogWarning("Registration failed — applicant under {MinAge}", MinimumAgeYears);
+            return HandlerResult<AuthResponseDto>.BadRequest($"You must be at least {MinimumAgeYears} years old to register.");
+        }
 
         var existingUser = await _userManager.FindByEmailAsync(dto.Email);
         if (existingUser != null)
@@ -52,6 +69,7 @@ public sealed class RegisterUserHandler : IRequestHandler<RegisterUserRequest, A
             UserId = Guid.NewGuid(),
             Username = dto.Username,
             Email = dto.Email,
+            DateOfBirth = dto.DateOfBirth,
             CreatedAt = DateTime.UtcNow
         };
 
