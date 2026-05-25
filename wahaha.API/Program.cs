@@ -161,7 +161,7 @@ builder.Services.AddCors(options =>
         else
         {
             policy
-                .WithOrigins("http://localhost:3000")
+                .WithOrigins("http://localhost:3000", "https://wahahah-byte.github.io/wahaha-byte/")
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         }
