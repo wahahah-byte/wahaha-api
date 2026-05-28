@@ -214,6 +214,16 @@ public sealed class CheckInTaskHandler : IRequestHandler<CheckInTaskRequest, Che
         task.LastCheckInDate = req.ClientToday;
         // Task mutations flushed via tracker; no separate UpdateAsync.
 
+        // Absolute-target semantics: when the client sends counterValue it
+        // represents the desired daily total, so any prior "log" cycles for
+        // today must be cleared — otherwise the preserved value from an
+        // earlier undo (UndoCheckIn recreates the cycle's value as a log
+        // cycle) would stack on top and double-count.
+        if (counterValue.HasValue)
+        {
+            await _cycleRepo.DeleteDailyLogsAsync(req.TaskId, req.ClientToday);
+        }
+
         var newCycle = new TaskCheckInCycle
         {
             TaskId = req.TaskId,

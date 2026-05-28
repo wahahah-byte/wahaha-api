@@ -61,4 +61,25 @@ public class TaskCheckInCycleRepository : Repository<TaskCheckInCycle, int>, ITa
                      && c.CounterValue.HasValue)
             .SumAsync(c => c.CounterValue!.Value);
     }
+
+    public async Task<int> DeleteDailyLogsAsync(Guid taskId, DateTime date)
+    {
+        var rows = await _dbSet
+            .Where(c => c.TaskId == taskId
+                     && c.CheckInDate.Date == date.Date
+                     && c.CycleType == "log")
+            .ExecuteDeleteAsync();
+        // Detach any tracked entities we just wiped so a follow-up SaveChanges
+        // in the same handler tx doesn't try to re-mutate them.
+        foreach (var entry in _context.ChangeTracker.Entries<TaskCheckInCycle>().ToList())
+        {
+            if (entry.Entity.TaskId == taskId
+                && entry.Entity.CheckInDate.Date == date.Date
+                && entry.Entity.CycleType == "log")
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
+        return rows;
+    }
 }
