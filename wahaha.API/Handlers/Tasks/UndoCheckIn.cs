@@ -132,7 +132,30 @@ public sealed class UndoCheckInHandler : IRequestHandler<UndoCheckInHandlerReque
 
         await _taskRepo.SetCycleStateAsync(req.TaskId, cycle.PreviousDueDate, cycle.PreviousLastCheckInDate);
 
+        // Preserve any counter value that was committed into this check-in cycle
+        // (e.g. the buffered tap-log delta absorbed at slide-commit time, or the
+        // amount entered through the custom-log modal's overshoot path). Without
+        // this, the value disappears with the deleted cycle and the logger
+        // displays zero after undo while the user expects to see what they had
+        // logged. Re-creating it as a "log" cycle restores the daily-counter sum
+        // computed client-side from recentCycles. counterValue is stored as 0 in
+        // some legacy rows, so guard with > 0 to avoid junk log entries.
+        var restoredCounterValue = cycle.CounterValue;
+        var restoredCheckInDate = cycle.CheckInDate;
+
         await _cycleRepo.DeleteAsync(cycle.CycleId);
+
+        if (restoredCounterValue.HasValue && restoredCounterValue.Value > 0)
+        {
+            await _cycleRepo.CreateAsync(new TaskCheckInCycle
+            {
+                TaskId = req.TaskId,
+                CheckInDate = restoredCheckInDate,
+                CounterValue = restoredCounterValue,
+                CreatedAt = DateTime.UtcNow,
+                CycleType = "log",
+            });
+        }
 
         var user = await _userRepo.GetByIdAsync(req.UserId);
         var newRecurringTotal = await _txRepo.GetDailyEarnedBySourceTypeAsync(req.UserId, DateTime.UtcNow, SourceType.recurring_task);

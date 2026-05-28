@@ -4,8 +4,8 @@ public static class PointCaps
 {
     public const int RegularDaily = 200;
     public const int RecurringDaily = 200;
-    public const int PerCategoryRegularDaily = 50;
-    public const int PerCategoryRecurringDaily = 50;
+    public const int PerCategoryRegularDaily = 150;
+    public const int PerCategoryRecurringDaily = 150;
 
     public static readonly IReadOnlyDictionary<string, int> PerTaskValue =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
