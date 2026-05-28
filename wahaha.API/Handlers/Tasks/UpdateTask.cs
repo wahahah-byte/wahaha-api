@@ -51,7 +51,12 @@ public sealed class UpdateTaskHandler : IRequestHandler<UpdateTaskRequest, Unit>
         {
             if (!string.Equals(dto.Title?.Trim(), task.Title?.Trim(), StringComparison.Ordinal))
                 return HandlerResult<Unit>.BadRequest("Task title cannot be changed more than 24 hours after creation.");
-            if (dto.PointValue != task.PointValue)
+            // The point lock guards against retroactively inflating a task's reward.
+            // Converting to/from recurring forces a new point ceiling (routines cap
+            // lower), so a point change here is a system-mandated side effect of the
+            // type switch, not gaming — allow it when the recurrence type changes.
+            var recurrenceTypeChanged = dto.IsRecurring != task.IsRecurring;
+            if (!recurrenceTypeChanged && dto.PointValue != task.PointValue)
                 return HandlerResult<Unit>.BadRequest("Task point value cannot be changed more than 24 hours after creation.");
         }
 
@@ -61,6 +66,8 @@ public sealed class UpdateTaskHandler : IRequestHandler<UpdateTaskRequest, Unit>
             if (dto.PointValue > perTaskCap)
                 return HandlerResult<Unit>.BadRequest($"{dto.Category} tasks are capped at {perTaskCap} points each.");
         }
+        if (dto.IsRecurring && dto.PointValue > Models.PointCaps.RecurringPerTask)
+            return HandlerResult<Unit>.BadRequest($"Recurring tasks are capped at {Models.PointCaps.RecurringPerTask} points each.");
 
         if (Enum.TryParse<ByteTaskStatus>(dto.Status, true, out var resultingStatus))
         {

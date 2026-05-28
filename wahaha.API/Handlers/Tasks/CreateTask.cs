@@ -38,6 +38,8 @@ public sealed class CreateTaskHandler : IRequestHandler<CreateTaskRequest, TaskD
         var perTaskCap = Models.PointCaps.MaxFor(dto.Category);
         if (dto.PointValue > perTaskCap)
             return HandlerResult<TaskDto>.BadRequest($"{dto.Category} tasks are capped at {perTaskCap} points each.");
+        if (dto.IsRecurring && dto.PointValue > Models.PointCaps.RecurringPerTask)
+            return HandlerResult<TaskDto>.BadRequest($"Recurring tasks are capped at {Models.PointCaps.RecurringPerTask} points each.");
 
         var task = _mapper.Map<DomainTask>(dto);
         task.UserId = request.UserId;

@@ -7,6 +7,10 @@ public static class PointCaps
     public const int PerCategoryRegularDaily = 150;
     public const int PerCategoryRecurringDaily = 150;
 
+    // Recurring tasks award per cycle, so each one is capped well below the
+    // per-category regular cap regardless of category.
+    public const int RecurringPerTask = 5;
+
     public static readonly IReadOnlyDictionary<string, int> PerTaskValue =
         new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
