@@ -71,8 +71,6 @@ public sealed class SubmitPointsHandler : IRequestHandler<SubmitPointsHandlerReq
             return cap - earned;
         }
 
-        var existingTransactions = await _txRepo.GetByUserAsync(userId);
-
         foreach (var taskIdStr in request.TaskIds)
         {
             if (!Guid.TryParse(taskIdStr, out var taskId))
@@ -123,11 +121,11 @@ public sealed class SubmitPointsHandler : IRequestHandler<SubmitPointsHandlerReq
             }
             else
             {
-                var alreadySubmitted = existingTransactions.Any(t =>
-                    t.SourceType == SourceType.task &&
-                    t.SourceId == task.TaskId.GetHashCode());
-
-                if (alreadySubmitted)
+                // Persisted Submitted flag is the source of truth: the previous
+                // check compared transaction.SourceId == task.TaskId.GetHashCode()
+                // but SourceId was never set on the insert, so it matched no
+                // existing row and duplicate submissions silently double-awarded.
+                if (task.Submitted == true)
                 {
                     _logger.LogWarning("Points already submitted for task {TaskId}", taskId);
                     AddFailure(taskIdStr, $"Points for task '{task.Title}' have already been submitted.");
