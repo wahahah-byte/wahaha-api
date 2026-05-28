@@ -90,6 +90,11 @@ public sealed class CheckInTaskHandler : IRequestHandler<CheckInTaskRequest, Che
                 return HandlerResult<CheckInResponse>.BadRequest("This task does not track a counter.");
             if (counterValue.Value < 0)
                 return HandlerResult<CheckInResponse>.BadRequest("Counter value must be non-negative.");
+            // Defense-in-depth: clamp at the goal so no codepath (e.g. an
+            // absolute-target check-in that started from an already-at-goal
+            // undo-preserved log cycle) can persist more than the goal.
+            if (task.CapLogAtGoal && task.CounterGoal.HasValue && counterValue.Value > task.CounterGoal.Value)
+                counterValue = task.CounterGoal.Value;
         }
 
         // Idempotency: today < DueDate means already-checked-in for this cycle.
