@@ -10,8 +10,6 @@ public interface ITaskCheckInCycleRepository : IRepository<TaskCheckInCycle, int
     Task<TaskCheckInCycle?> GetLatestCheckinByTaskIdAsync(Guid taskId);
     // Daily CounterValue sum used to guard quick-log deltas from going negative.
     Task<int> GetDailyCounterSumAsync(Guid taskId, DateTime date);
-    // Removes today's "log" cycles for a task so the check-in handler can
-    // consolidate them into a single checkin cycle when the client supplies
-    // an absolute target. Returns the number of rows deleted.
+    // Removes today's "log" cycles so the handler can consolidate them into one checkin cycle; returns rows deleted.
     Task<int> DeleteDailyLogsAsync(Guid taskId, DateTime date);
 }

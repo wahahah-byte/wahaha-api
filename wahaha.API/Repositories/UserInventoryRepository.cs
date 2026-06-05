@@ -105,8 +105,7 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
         foreach (var other in sameSlotItems)
             other.IsEquipped = false;
 
-        // 2H WEAPON_FRONT and OFFHAND are mutually exclusive (MapleStory rule).
-        // Category-based 2H detection — staff/polearm/bow/greatsword/two-hand.
+        // 2H WEAPON_FRONT and OFFHAND are mutually exclusive (category-based 2H detection: staff/polearm/bow/etc).
         if (IsTwoHanded(entry.AvatarItem))
         {
             // Equipping a 2H primary: drop any equipped off-hand item.
@@ -136,8 +135,7 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
             }
         }
 
-        // Cross-slot mutex groups (outfit / hair / hat). Filter the user's equipped rows
-        // to the ones whose slot conflicts with the new item's slot, drop them.
+        // Cross-slot mutex groups (outfit/hair/hat): drop equipped rows whose slot conflicts with the new item.
         var crossSlotConflicts = await _dbSet
             .Include(i => i.AvatarItem)
             .Where(i => i.UserId == entry.UserId
@@ -158,8 +156,7 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
         return true;
     }
 
-    // Two-handed primary weapons block the off-hand slot. Mirrors apps/web/src/app/avatar/page.tsx
-    // isTwoHanded — keep the token list in sync across client + server.
+    // Two-handed primary weapons block the off-hand slot; mirrors web isTwoHanded — keep token list in sync.
     private static bool IsTwoHanded(AvatarItem? item)
     {
         if (item == null || item.Slot != ItemSlot.WEAPON_FRONT) return false;
@@ -172,11 +169,7 @@ public class UserInventoryRepository : Repository<UserInventory, int>, IUserInve
             || cat.Contains("twohand");
     }
 
-    // Cross-slot equip mutex groups. Mirrors apps/web/src/app/avatar/page.tsx shouldDropOnEquip
-    // — keep the groups in sync across client + server.
-    //   Outfit: OVERALL/BODY (full-body) ↔ TOP/BOTTOM (partial). Partials coexist with each other.
-    //   Hair:   HAIR / HAIR_FRONT / HAIR_BACK.
-    //   Hat:    HAT / HEAD.
+    // Cross-slot equip mutex groups (mirror web shouldDropOnEquip): outfit OVERALL/BODY↔TOP/BOTTOM, hair, hat.
     private static bool ShouldDropOnEquip(ItemSlot newSlot, ItemSlot existingSlot)
     {
         if (newSlot == existingSlot) return false;

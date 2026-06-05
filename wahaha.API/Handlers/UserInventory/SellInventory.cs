@@ -6,13 +6,7 @@ namespace wahaha.API.Handlers.UserInventory;
 
 public sealed record SellInventoryRequest(int InventoryId, Guid UserId);
 
-// Sell-back: removes an inventory row and credits the user a fraction of the original cost.
-// Used to clean up unwanted duplicates (and any item the user no longer wants).
-//
-//   refund = floor(item.Cost * SellRefundRatio)
-//
-// If the item is currently equipped, the row is unequipped first (the chibi composite
-// would otherwise render a missing slot until the next refresh).
+// Sell-back: removes an inventory row and credits floor(item.Cost * SellRefundRatio); unequips first if equipped.
 public sealed class SellInventoryHandler : IRequestHandler<SellInventoryRequest, SellInventoryResponseDto>
 {
     // 50% refund — discourages buy/sell farming while keeping "regret" actions cheap.

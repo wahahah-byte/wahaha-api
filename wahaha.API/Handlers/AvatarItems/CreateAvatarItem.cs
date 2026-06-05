@@ -112,8 +112,7 @@ public sealed class CreateAvatarItemHandler : IRequestHandler<CreateAvatarItemRe
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
 
-    // Slot-dependent secondary suffix: CAPE / OFFHAND secondaries are the FRONT overlay
-    // (front drape / strap wrap over the arm); other slots use the secondary as a BACK layer.
+    // CAPE / OFFHAND secondary = FRONT overlay (drape / strap wrap); other slots = BACK layer.
     private static string SecondarySuffix(string slot)
         => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase)
            || slot.Equals("OFFHAND", StringComparison.OrdinalIgnoreCase)

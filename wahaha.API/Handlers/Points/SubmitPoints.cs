@@ -121,10 +121,7 @@ public sealed class SubmitPointsHandler : IRequestHandler<SubmitPointsHandlerReq
             }
             else
             {
-                // Persisted Submitted flag is the source of truth: the previous
-                // check compared transaction.SourceId == task.TaskId.GetHashCode()
-                // but SourceId was never set on the insert, so it matched no
-                // existing row and duplicate submissions silently double-awarded.
+                // Persisted Submitted flag is the source of truth, preventing duplicate submissions from double-awarding.
                 if (task.Submitted == true)
                 {
                     _logger.LogWarning("Points already submitted for task {TaskId}", taskId);

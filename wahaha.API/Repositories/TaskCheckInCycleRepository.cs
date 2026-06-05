@@ -69,8 +69,7 @@ public class TaskCheckInCycleRepository : Repository<TaskCheckInCycle, int>, ITa
                      && c.CheckInDate.Date == date.Date
                      && c.CycleType == "log")
             .ExecuteDeleteAsync();
-        // Detach any tracked entities we just wiped so a follow-up SaveChanges
-        // in the same handler tx doesn't try to re-mutate them.
+        // Detach tracked entities we just wiped so a follow-up SaveChanges in the same tx doesn't re-mutate them.
         foreach (var entry in _context.ChangeTracker.Entries<TaskCheckInCycle>().ToList())
         {
             if (entry.Entity.TaskId == taskId

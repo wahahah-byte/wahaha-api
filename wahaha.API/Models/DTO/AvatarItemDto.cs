@@ -17,8 +17,7 @@ public class AvatarItemDto
     // Optional secondary blob URL for two-layer items (HAIR_FRONT today); null = single-layer.
     public string? SecondaryAssetUrl { get; set; }
 
-    // Optional "worn" view used by the chibi composite when the catalog preview is a
-    // different angle (e.g. shields: shop = front face, chibi = back/strap). Null = fall back to PreviewAssetUrl.
+    // Optional "worn" view used by the chibi composite when the catalog preview differs; null = fall back to PreviewAssetUrl.
     public string? EquippedAssetUrl { get; set; }
 
     // Inventory footprint in grid cells; null = 1x1 client-side.
@@ -161,8 +160,7 @@ public class PurchaseAvatarItemResponseDto
     public int NewBalance { get; set; }
 }
 
-// Sell response: refund credited + post-sale balance + the inventoryId that was removed
-// (so the client can splice it out of its local inventory list).
+// Sell response: refund credited + post-sale balance + the removed inventoryId for client-side splicing.
 public class SellInventoryResponseDto
 {
     public int InventoryId { get; set; }

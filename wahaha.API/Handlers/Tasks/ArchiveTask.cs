@@ -26,6 +26,11 @@ public sealed class ArchiveTaskHandler : IRequestHandler<ArchiveTaskRequest, Uni
         }
         if (task.Status != ByteTaskStatus.completed)
             return HandlerResult<Unit>.BadRequest("Only completed tasks can be archived.");
+        // Non-recurring tasks earn their points on submit, so block archiving until the
+        // points have been claimed — otherwise archiving silently forfeits them. Recurring
+        // tasks earn via check-in (Submitted is never set / reset each cycle), so they are exempt.
+        if (!task.IsRecurring && task.Submitted != true)
+            return HandlerResult<Unit>.BadRequest("Submit this task for points before archiving it.");
         var success = await _taskRepo.SetArchivedAsync(request.TaskId, true);
         if (!success) return HandlerResult<Unit>.BadRequest("Task could not be archived.");
         _logger.LogInformation("Task {TaskId} archived by user {UserId}", request.TaskId, request.UserId);

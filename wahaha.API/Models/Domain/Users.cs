@@ -40,8 +40,7 @@ public class Users
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    // Used to enforce the 13+ age gate at signup. Nullable so the migration can backfill
-    // without breaking existing rows; new registrations always set it.
+    // Enforces the 13+ age gate at signup; nullable so the migration can backfill existing rows.
     [Column("date_of_birth")]
     public DateOnly? DateOfBirth { get; set; }
 

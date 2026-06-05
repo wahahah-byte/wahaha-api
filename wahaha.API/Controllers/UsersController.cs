@@ -67,9 +67,7 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> SpendPoints(int points)
         => (await _spendPoints.HandleAsync(new SpendPointsRequest(GetCurrentUserId(), points))).ToActionResult();
 
-    // Permanently deletes the caller's account and all owned data. Client must clear its token
-    // after a 204 — the JWT remains technically valid until expiry but every authed request will
-    // now fail because the user row is gone.
+    // Permanently deletes the caller's account and all owned data; client must clear its token after a 204.
     [HttpDelete("me")]
     public async Task<IActionResult> DeleteAccount()
         => (await _deleteAccount.HandleAsync(new DeleteAccountRequest(GetCurrentUserId()))).ToActionResult();

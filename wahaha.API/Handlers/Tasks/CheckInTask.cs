@@ -90,9 +90,7 @@ public sealed class CheckInTaskHandler : IRequestHandler<CheckInTaskRequest, Che
                 return HandlerResult<CheckInResponse>.BadRequest("This task does not track a counter.");
             if (counterValue.Value < 0)
                 return HandlerResult<CheckInResponse>.BadRequest("Counter value must be non-negative.");
-            // Defense-in-depth: clamp at the goal so no codepath (e.g. an
-            // absolute-target check-in that started from an already-at-goal
-            // undo-preserved log cycle) can persist more than the goal.
+            // Defense-in-depth: clamp at the goal so no codepath persists more than the goal.
             if (task.CapLogAtGoal && task.CounterGoal.HasValue && counterValue.Value > task.CounterGoal.Value)
                 counterValue = task.CounterGoal.Value;
         }
@@ -219,11 +217,7 @@ public sealed class CheckInTaskHandler : IRequestHandler<CheckInTaskRequest, Che
         task.LastCheckInDate = req.ClientToday;
         // Task mutations flushed via tracker; no separate UpdateAsync.
 
-        // Absolute-target semantics: when the client sends counterValue it
-        // represents the desired daily total, so any prior "log" cycles for
-        // today must be cleared — otherwise the preserved value from an
-        // earlier undo (UndoCheckIn recreates the cycle's value as a log
-        // cycle) would stack on top and double-count.
+        // Absolute-target semantics: counterValue is the desired daily total, so clear prior "log" cycles for today to avoid double-counting.
         if (counterValue.HasValue)
         {
             await _cycleRepo.DeleteDailyLogsAsync(req.TaskId, req.ClientToday);

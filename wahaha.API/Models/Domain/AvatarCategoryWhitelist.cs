@@ -1,12 +1,6 @@
 namespace wahaha.API.Models.Domain;
 
-// Per-slot category whitelist. Mirrors packages/shared/src/avatar/categories.ts —
-// keep the two lists in sync. The admin form's dropdown only surfaces canonical
-// categories; this whitelist (canonical + legacy) is what server validation accepts.
-//
-// The split exists so admins can edit existing rows whose category isn't canonical
-// (those go in the LegacyExtras dictionary) without the request 400'ing, while still
-// blocking new items from inventing freeform categories.
+// Per-slot category whitelist (mirror shared categories.ts): canonical names surface in the admin dropdown, while LegacyExtras lets old rows round-trip on edit without blocking new freeform categories.
 public static class AvatarCategoryWhitelist
 {
     // Canonical names per slot, in the same order as the TypeScript dropdown.
@@ -25,8 +19,7 @@ public static class AvatarCategoryWhitelist
         [ItemSlot.CAPE]         = new[] { "cape", "cloak", "wings", "scarf" },
         [ItemSlot.GLOVES]       = new[] { "gloves", "mittens", "gauntlets" },
         [ItemSlot.SHOES]        = new[] { "boots", "sneakers", "sandals", "heels", "flats" },
-        // WEAPON_FRONT and WEAPON_BACK accept the same categories — the slots differ only by
-        // chibi render z-order. A sheathed sword and a held sword are both "sword".
+        // WEAPON_FRONT and WEAPON_BACK accept the same categories; slots differ only by chibi render z-order.
         [ItemSlot.WEAPON_FRONT] = new[] { "sword", "greatsword", "dagger", "staff", "polearm", "bow", "wand", "axe", "quiver", "holster", "sheath", "backpack" },
         [ItemSlot.WEAPON_BACK]  = new[] { "sword", "greatsword", "dagger", "staff", "polearm", "bow", "wand", "axe", "quiver", "holster", "sheath", "backpack" },
         [ItemSlot.OFFHAND]      = new[] { "shield", "dagger", "orb", "tome", "lantern", "buckler" },
@@ -40,8 +33,7 @@ public static class AvatarCategoryWhitelist
         [ItemSlot.FEET]         = new[] { "footwear", "boots", "sneakers" },
     };
 
-    // Accepted-but-hidden categories for backward compat with rows seeded before this list.
-    // The admin dropdown does NOT surface these — they round-trip on edit but new items can't pick them.
+    // Accepted-but-hidden categories for backward compat; round-trip on edit but the admin dropdown hides them.
     private static readonly IReadOnlyDictionary<ItemSlot, string[]> LegacyExtras = new Dictionary<ItemSlot, string[]>
     {
         [ItemSlot.HAT]          = new[] { "headwear" },

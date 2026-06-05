@@ -112,11 +112,7 @@ public class MappingProfile : Profile
 
         // Users
         CreateMap<Users, UserDto>()
-            // PointsSubmittedToday is the daily-cap counter — only task-source EARNs count
-            // toward it. Other EARN sources (shop_item refunds, streak/achievement bonuses,
-            // minigame wins) are NOT subject to the cap and would otherwise inflate the
-            // nav-drawer progress bars. Matches SubmitPoints' alreadyEarnedRegular/Recurring
-            // queries which also filter by SourceType.task / SourceType.recurring_task.
+            // PointsSubmittedToday: daily-cap counter — only task-source EARNs count (matches SubmitPoints' SourceType.task / recurring_task filter).
             .ForMember(dest => dest.PointsSubmittedToday, opt => opt.MapFrom(src =>
                 src.PointTransactions
                     .Where(pt => pt.Type == TransactionType.EARN

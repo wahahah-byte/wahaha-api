@@ -45,9 +45,7 @@ public class AvatarItem
     [Column("secondary_asset_url")]
     public string? SecondaryAssetUrl { get; set; }
 
-    // Optional "worn" view, used by the chibi composite when the catalog preview is
-    // a different angle (e.g. shields: shop shows front face, chibi shows back/strap).
-    // When null, ChibiAvatar falls back to PreviewAssetUrl.
+    // Optional "worn" view used by the chibi composite when the catalog preview differs; null = ChibiAvatar falls back to PreviewAssetUrl.
     [MaxLength(255)]
     [Column("equipped_asset_url")]
     public string? EquippedAssetUrl { get; set; }

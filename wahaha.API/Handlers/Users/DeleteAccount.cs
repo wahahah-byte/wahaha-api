@@ -8,10 +8,7 @@ namespace wahaha.API.Handlers.Users;
 
 public sealed record DeleteAccountRequest(Guid UserId);
 
-// Hard-deletes the user, their domain rows (tasks, inventory, sessions, streaks, transactions),
-// the profile-picture blob, and the Identity row. Required for Google Play / GDPR / CCPA
-// account-deletion compliance. Operates inside a transaction so a partial failure leaves the
-// account intact; the blob delete is best-effort (logged but not fatal).
+// Hard-deletes the user, their domain rows, the profile-picture blob, and the Identity row for GDPR/CCPA compliance; transactional with best-effort blob delete.
 public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountRequest, Unit>
 {
     private readonly WahahaDbContext _context;
@@ -45,8 +42,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountRequest,
         await using var tx = await _context.Database.BeginTransactionAsync(ct);
         try
         {
-            // PointTransactions/MinigameSessions/Streaks/UserInventories have no cascade configured;
-            // delete explicitly. Tasks → Subtasks + TaskCheckInCycles cascade per WahahaDbContext config.
+            // Non-cascading rows deleted explicitly; Tasks → Subtasks + TaskCheckInCycles cascade per WahahaDbContext config.
             await _context.PointTransactions.Where(x => x.UserId == userId).ExecuteDeleteAsync(ct);
             await _context.MinigameSessions.Where(x => x.UserId == userId).ExecuteDeleteAsync(ct);
             await _context.Streaks.Where(x => x.UserId == userId).ExecuteDeleteAsync(ct);
@@ -62,9 +58,7 @@ public sealed class DeleteAccountHandler : IRequestHandler<DeleteAccountRequest,
             return HandlerResult<Unit>.BadRequest("Account deletion failed — please try again.");
         }
 
-        // Delete the Identity row separately — different DbContext (AuthDbContext / auth schema).
-        // If this fails the domain rows are gone but the auth shell remains; login would crash on
-        // missing AppUserId so the row is effectively dead. Logged loudly so it can be cleaned up.
+        // Delete the Identity row separately (different DbContext); on failure the orphaned auth shell is logged loudly for cleanup.
         var identity = await _userManager.Users.FirstOrDefaultAsync(u => u.AppUserId == userId, ct);
         if (identity != null)
         {

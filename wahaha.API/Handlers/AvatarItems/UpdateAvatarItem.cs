@@ -134,8 +134,7 @@ public sealed class UpdateAvatarItemHandler : IRequestHandler<UpdateAvatarItemRe
     private static string BuildBlobName(string slot, string name)
         => $"{slot}_{name}";
 
-    // CAPE / OFFHAND secondary = FRONT overlay (drape / strap wrap);
-    // HAIR_FRONT and WEAPON_FRONT secondaries = back layer.
+    // CAPE / OFFHAND secondary = FRONT overlay (drape / strap wrap); other slots = back layer.
     private static string SecondarySuffix(string slot)
         => slot.Equals("CAPE", StringComparison.OrdinalIgnoreCase)
            || slot.Equals("OFFHAND", StringComparison.OrdinalIgnoreCase)
